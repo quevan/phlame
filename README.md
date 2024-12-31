@@ -1,4 +1,4 @@
-PHLAME: Novelty-aware intraspecies profiling in strain-rich metagenomes
+# PHLAME: Novelty-aware intraspecies profiling in strain-rich metagenomes
 
 PHLAME is a complete pipeline for the creation of intraspecies reference databases and the metagenomic detection of intraspecies clades, their relative frequency, and their estimated divergence from the reference phylogeny.
 
