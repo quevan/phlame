@@ -1,0 +1,4 @@
+experiment_name: "test"
+sample_table: ./samples.csv
+myscripts_directory: ./scripts
+ref_genome_directory: /home/equ/mit_lieberman/reference_genomes
