@@ -55,26 +55,29 @@ if __name__ == '__main__':
 
     # Classify arguments
     classify_op.add_argument('-i', dest='input', type=str, required=True, 
-                          help='Path to input counts file')
+                          help='Path to input counts file.')
     classify_op.add_argument('-c', dest='classifier', type=str, required=True,
-                          help='Path to classifer file')
+                          help='Path to classifer file.')
     classify_op.add_argument('-l', dest='level', type=str, default=False, required=False,
-                          help='Level specification')
+                          help='Level specification.')
     classify_op.add_argument('-o', dest='output', type=str, required=True,
                           help='Path to output frequencies file (.csv)')
     classify_op.add_argument('-p', dest='outputdata', type=str, default=False, required=False,
-                          help='Path to output data file (.pickle)')
+                          help='Path to output data file (.pickle.gz)')
+    classify_op.add_argument('-m', choices=['bayesian', 'mle'], required=True,
+                             help="Inference algorithm to use (default mle).", default="MLE")
     classify_op.add_argument('--max_pi', type=float, default=0.3, required=False,
-                          help='Maximum pi value to count a lineage as present')
-    classify_op.add_argument('--min_prob', type=float, default=0.5, required=False,
-                          help='Minimum probability score to count a lineage as present')
+                          help='Maximum pi value to count a lineage as present.')
     classify_op.add_argument('--min_snps', type=int, default=10, required=False,
-                          help='Minimum number of marker SNPs with non-zero counts to count a lineage as present')
-    classify_op.add_argument('--min_hpd', type=int, default=10, required=False,
-                          help='Minimum value the highest posterior density interval over divergence must cover to count a lineage as present')
+                          help='Minimum number of present mutations to count a lineage as present.')
+    classify_op.add_argument('--min_prob', type=float, default=0.5, required=False,
+                          help='Bayesian only: Minimum probability score to count a lineage as present.')
+    classify_op.add_argument('--min_hpd', type=int, default=0.15, required=False,
+                          help='Bayesian only: Minimum value the highest posterior density interval over divergence must cover to count a lineage as present.')
     classify_op.add_argument('--seed', type=int, required=False, default=False,
                           help='Set random seed for reproducibility.') 
-
+    classify_op.add_argument('--verbose', required=False,  action='store_true', default=True,
+                            help='Print progress messages.')
 
     # Make_classifier arguments
     makedb_op.add_argument('-i', dest='input', type=str, required=True, 
@@ -125,13 +128,15 @@ if __name__ == '__main__':
         results = classify.Classify(args.input,
                                     args.classifier,
                                     args.output,
+                                    mode = args.m,
                                     level_input = args.level,
                                     path_to_output_data = args.outputdata,
                                     max_pi = args.max_pi,
                                     min_snps = args.min_snps,
                                     min_prob = args.min_prob,
                                     min_hpd=args.min_hpd,
-                                    seed = args.seed)
+                                    seed = args.seed,
+                                    verbose = args.verbose)
         
         results.main()
 
@@ -150,12 +155,6 @@ if __name__ == '__main__':
                            max_qual_for_call = -30)
 
         db.main()
-
-        # makedb.make_classifier(args.input, args.output,
-        #                         args.clades, args.cladestree,
-        #                         args.min_snps,
-        #                         args.maxn,
-        #                         args.core)
         
     if args.operation=='tree':
         
