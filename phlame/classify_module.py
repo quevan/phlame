@@ -19,56 +19,12 @@ from scipy.optimize import minimize
 from statsmodels.base.model import GenericLikelihoodModel
 from scipy.special import digamma, loggamma
 
+import phlame.helper_functions as helper
+
 #%%
 
 # Limit for exponentials to avoid overflow
 EXP_UPPER_LIMIT = np.log(np.finfo(np.float64).max) - 1.0
-
-    
-class Frequencies():
-    '''
-    Holds clade frequency information from a given sample.
-    '''
-    
-    def __init__(self, path_to_frequencies_file):
-        
-        self.freqs = pd.read_csv(path_to_frequencies_file,
-                                       index_col=0)
-                
-class FrequenciesData():
-    '''
-    Holds csSNP counts and modeling information from a given sample.
-    '''
-
-    def __init__(self, path_to_data_file):
-        
-        with gzip.open(path_to_data_file, 'rb') as f:
-            
-            data_dct, fit_info_dct = pickle.load(f)
-            
-            # clade_counts structured as follows
-            
-            self.clade_counts = data_dct['clade_counts']
-            self.clade_counts_pos = data_dct['clade_counts_pos']
-            
-            self.counts_MLE = fit_info_dct['counts_MLE']
-            self.total_MLE = fit_info_dct['total_MLE']
-            self.counts_MAP = fit_info_dct['counts_MAP']
-            self.chain = fit_info_dct['chain']
-            self.prob = fit_info_dct['prob']
-
-
-class CountsMat():
-    '''
-    Hold data and methods for a counts matrix
-    '''
-    def __init__(self, path_to_cts_file):
-        
-        with gzip.open(path_to_cts_file,'rb') as f:
-            counts, pos = pickle.load(f)
-                
-        self.counts = counts
-        self.pos = pos
         
 class Classify:
     '''
@@ -155,9 +111,9 @@ class Classify:
 
     def load_data(self):
         
-        self.countsmat = CountsMat(self.__path_to_counts_file)
+        self.countsmat = helper.CountsMat(self.__path_to_counts_file)
         
-        self.classifier = PhlameClassifier.read_file(self.__classifier_file)
+        self.classifier = helper.PhlameClassifier.read_file(self.__classifier_file)
         
         if self.__levels_input:
             self.mylevel = PhyloLevel(self.__levels_input, 
@@ -366,64 +322,6 @@ class Classify:
                       clade_tot_f,
                       clade_tot_r])
 
-        
-class PhlameClassifier():
-    '''
-    Holds data and methods for a single Phlame Classifier object
-    '''
-    def __init__(self,
-                 csSNPs, csSNP_pos,
-                 clades, clade_names):
-
-        self.csSNPs = csSNPs
-        self.csSNP_pos = csSNP_pos
-        self.clades = clades
-        self.clade_names = clade_names
-        
-        # Get allele information
-        self.get_alleles()
-    
-    def read_file(path_to_classifier_file):
-
-        with gzip.open(path_to_classifier_file, 'rb') as f:
-            cssnp_dct = pickle.load(f)
-            
-            csSNPs = cssnp_dct['cssnps']
-            csSNP_pos = cssnp_dct['cssnp_pos']
-            clades = cssnp_dct['clades']
-            clade_names = cssnp_dct['clade_names']
-            
-        return PhlameClassifier(csSNPs, csSNP_pos, clades, clade_names)
-
-    def grab_level(self, PhyloLevel):
-        '''
-        Grab just information for a specific level.
-        '''
-        
-        idx=[]
-        
-        for clade in PhyloLevel.clade_names:
-            
-            idx.append(np.where(self.clade_names==clade)[0][0])
-        
-        level_csSNPs = self.csSNPs[:,idx]
-
-        level_csSNP_pos = self.csSNP_pos[~np.all(level_csSNPs == 0, axis=1)]
-        
-        return PhlameClassifier(level_csSNPs[~np.all(level_csSNPs == 0, axis=1)],
-                                level_csSNP_pos,
-                                PhyloLevel.clades,
-                                PhyloLevel.names)
-    
-    def get_alleles(self):
-        '''
-        Get 1D list of every allele and corresponding clade.
-        '''
-        self.alleles = self.csSNPs[np.nonzero(self.csSNPs)]
-        # corresponding clade index
-        self.allele_cidx = np.nonzero(self.csSNPs)[1]
-
-
 class countsCSS_NEW:
     '''
     Hold and model counts data covering a single set of cluster-specific SNPs.
@@ -432,10 +330,10 @@ class countsCSS_NEW:
     def __init__(self, 
                  counts, total_counts,
                  force_alpha=False,
-                 nullprior=False,
+                 prior=True,
                  prior_strength=20,
                  seed=False,
-                 mode='Bayesian'):
+                 mode='bayesian'):
         
         self.counts = counts
         self.total_counts = total_counts
@@ -464,7 +362,7 @@ class countsCSS_NEW:
         v = 0; s = 0
         self.params = [m, logp, v, s]
 
-        if nullprior:
+        if not prior:
             self.params = [0, np.log(1), 0, 0]
 
     def fit(self, max_pi,

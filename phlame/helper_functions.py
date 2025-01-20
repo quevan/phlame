@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 28 13:33:43 2022
+Helper functions and classes for phlame.
 
 @author: evanqu
 """
@@ -13,7 +13,107 @@ import pandas as pd
 from Bio import AlignIO
 from Bio import SeqIO
 
-# # To do: format --> functions generally not looked at / could be optimized/pruned
+
+class Frequencies():
+    '''
+    Holds clade frequency information from a given sample.
+    '''
+    
+    def __init__(self, path_to_frequencies_file):
+        
+        self.freqs = pd.read_csv(path_to_frequencies_file,
+                                       index_col=0)
+                
+class FrequenciesData():
+    '''
+    Holds clade specific SNV counts and modeling information from a given sample.
+    '''
+
+    def __init__(self, path_to_data_file):
+        
+        with gzip.open(path_to_data_file, 'rb') as f:
+            
+            data_dct, fit_info_dct = pickle.load(f)
+            
+            # clade_counts structured as follows
+            
+            self.clade_counts = data_dct['clade_counts']
+            self.clade_counts_pos = data_dct['clade_counts_pos']
+            
+            self.counts_MLE = fit_info_dct['counts_MLE']
+            self.total_MLE = fit_info_dct['total_MLE']
+            self.counts_MAP = fit_info_dct['counts_MAP']
+            self.chain = fit_info_dct['chain']
+            self.prob = fit_info_dct['prob']
+
+
+class CountsMat():
+    '''
+    Holds data and methods for a counts matrix.
+    '''
+    def __init__(self, path_to_cts_file):
+        
+        with gzip.open(path_to_cts_file,'rb') as f:
+            counts, pos = pickle.load(f)
+                
+        self.counts = counts
+        self.pos = pos
+
+class PhlameClassifier():
+    '''
+    Holds data and methods for a single Phlame Classifier object
+    '''
+    def __init__(self,
+                 csSNPs, csSNP_pos,
+                 clades, clade_names):
+
+        self.csSNPs = csSNPs
+        self.csSNP_pos = csSNP_pos
+        self.clades = clades
+        self.clade_names = clade_names
+        
+        # Get allele information
+        self.get_alleles()
+    
+    def read_file(path_to_classifier_file):
+
+        with gzip.open(path_to_classifier_file, 'rb') as f:
+            cssnp_dct = pickle.load(f)
+            
+            csSNPs = cssnp_dct['cssnps']
+            csSNP_pos = cssnp_dct['cssnp_pos']
+            clades = cssnp_dct['clades']
+            clade_names = cssnp_dct['clade_names']
+            
+        return PhlameClassifier(csSNPs, csSNP_pos, clades, clade_names)
+
+    def grab_level(self, PhyloLevel):
+        '''
+        Grab just information for a specific level.
+        '''
+        
+        idx=[]
+        
+        for clade in PhyloLevel.clade_names:
+            
+            idx.append(np.where(self.clade_names==clade)[0][0])
+        
+        level_csSNPs = self.csSNPs[:,idx]
+
+        level_csSNP_pos = self.csSNP_pos[~np.all(level_csSNPs == 0, axis=1)]
+        
+        return PhlameClassifier(level_csSNPs[~np.all(level_csSNPs == 0, axis=1)],
+                                level_csSNP_pos,
+                                PhyloLevel.clades,
+                                PhyloLevel.names)
+    
+    def get_alleles(self):
+        '''
+        Get 1D list of every allele and corresponding clade.
+        '''
+        self.alleles = self.csSNPs[np.nonzero(self.csSNPs)]
+        # corresponding clade index
+        self.allele_cidx = np.nonzero(self.csSNPs)[1]
 
 #Todo: add formal IO errors
 def read_cmt(path_to_cmt_file):
@@ -95,6 +195,13 @@ def read_clades_file(path_to_clades_file, uncl_marker):
         clade_names.append(clade)
             
     return clades_dct, np.array(clade_names)
+
+def rphylip(sample_names):
+    '''Change : to | for consistency with phylip format'''
+    
+    rename = [sam.replace(':','|') for sam in sample_names]
+    
+    return np.array(rename)
 
 def genomestats(path_to_refgenome_file):
     '''Extract relevant stats from a reference genome file.

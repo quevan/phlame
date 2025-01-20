@@ -14,46 +14,11 @@ import pickle
 import gzip
 import warnings
 import ete3
-import itertools
+import itertools    
 from scipy import stats
 
 import phlame.helper_functions as helper
 
-#%% Testing
-
-# Wishlist:
-# Check that files exist before running
-# import os
-# os.chdir('/Users/evanqu/Dropbox (MIT)/Lieberman Lab/Personal lab notebooks/Evan/1-Projects/phlame_project/benchmarks/2023_10_drop_1_clade_analysis')
-
-# path_to_cmt='CMTs/Sepi_acera_repCMT.pickle.gz'    
-# path_to_candidate_clades='Sepi_dropped_cladeIDs/Sepi_dropped_idx1.txt'
-# path_to_output_db='Sepi_dropped_classifiers/Sepi_dropped_idx1.classifier'
-
-
-# results = MakeDB(path_to_cmt,
-#                  path_to_candidate_clades,
-#                  path_to_output_db,
-#                  path_to_candidate_clades_tree=False,
-#                  min_cssnps=10,
-#                  maxn=0.1,
-#                  core=0.5,
-#                  max_outgroup=0.05,
-#                  min_maf_for_call=0.75,
-#                  min_strand_cov_for_call=2,
-#                  max_qual_for_call=-30)
-
-# results.main()
-
-# sample_names, pos, counts, quals, _, in_outgroup = helper.read_cmt(path_to_cmt)
-# candidate_clades, candidate_clade_names = results.read_clades_file(path_to_candidate_clades,
-#                                                             uncl_marker='-1')
-
-# sl = ['1AA3C_23YAS86','8AB1C_25YH90','7AB4F_22YB2','4AA1K_X1537','4AA1F_X1348','2PA3N_15YE35','4AB1N_X1560','4AA1F_X1474','3AA2C_X0887','3AA2C_X0885']
-
-# for s in sl:
-#     if s not in sample_names:
-#         print(f"{s} not found")
 #%% FXNs
 
 class MakeDB():
@@ -102,13 +67,13 @@ class MakeDB():
         # =========================================================================
         print('Reading in files...')
         sample_names, pos, counts, quals, _, in_outgroup = helper.read_cmt(self.__path_to_cmt)
-        sample_names = rphylip(sample_names)
+        sample_names = helper.rphylip(sample_names)
         maNT, maf, _, _ = helper.mant(counts)
 
         coverage_f_strand=counts[0:4,:,:].sum(axis=0) #should be pxs
         coverage_r_strand=counts[4:8,:,:].sum(axis=0)
 
-        candidate_clades, candidate_clade_names = read_clades_file(self.__path_to_candidate_clades,
+        candidate_clades, candidate_clade_names = helper.read_clades_file(self.__path_to_candidate_clades,
                                                                    uncl_marker='-1')
 
         if self.__path_to_candidate_clades_tree:
@@ -333,177 +298,3 @@ def unique_to_clade(maNT, unanimous_alleles, sample_names, candidate_clades, cla
         # print(f"{cname}: {np.count_nonzero(css_mat[:,c])} csSNPs")
     
     return css_mat
-
-
-# def make_classifier(path_to_cmt, path_to_output_classifier, path_to_candidate_clades,
-#                     path_to_candidate_clades_tree=False, min_cssnps=10, n=0.1, core=0.9):
-#     '''Given a list of clades and a corresponding array of polymorphic positions, 
-#        find mutations likely to have originated along the branch leading to that
-#        clade (clade-specific SNPs). These correspond to mutations that are shared 
-#        among all daughters of a particular clade (unanimous) which are also not 
-#        found in any other genome (unique).
-
-#     Args:
-#         path_to_cmt (str): Path to candidate mutation table file.\n
-#         path_to_output_classifier (str): Path to output classifier object.\n
-#         candidate_clades (str): Path to file listing candidate clades (csv).\n
-#         candidate_clades_tree (str, optional): Path to candidate clades tree (nwk). 
-#         Optional, defaults to False.\n
-#         min_cssnps (int): Minimum number of csSNPs to be included as a clade.\n
-#         n (float): % Ns within clade tolerated to be a csSNP (default 0.1).\n
-#         core (float): Minimum shared across samples to be a csSNP (default 0.9).\n
-#         multi (bool): 
-#     Returns:
-#         None.
-
-#     '''
-#     # =========================================================================
-#     # Read in files
-#     # =========================================================================
-#     print('Reading in files...')
-#     sample_names, pos, counts, _, _, in_outgroup = helper.read_cmt(path_to_cmt)
-#     sample_names = rphylip(sample_names)
-#     maNT, _, _, _ = helper.mant(counts)
-
-#     candidate_clades, candidate_clade_names = read_clades_file(path_to_candidate_clades,
-#                                                                uncl_marker='-1')
-    
-    
-#     if path_to_candidate_clades_tree:
-#         candidate_clades_tree = ete3.Tree(path_to_candidate_clades_tree, format=1)
-#         #1 includes node names
-#     else:
-#         candidate_clades_tree = False
-        
-#     # =========================================================================
-#     # Get csSNPs for every clade
-#     # =========================================================================
-    
-#     # Filter for only core genome
-#     is_core_genome = np.count_nonzero(maNT, axis=1)/len(maNT[1]) >= core
-#     core_maNT = maNT[is_core_genome]
-#     core_pos = pos[is_core_genome]
-#     print(f"Number of core positions: {len(core_pos)}/{len(pos)}")
-        
-#     #Call csSNPs
-#     print('Getting unanimous alleles...')
-#     unanimous_alleles = unanimous_to_clade(core_maNT, sample_names,
-#                                            candidate_clades, candidate_clade_names,
-#                                            n, core)
-
-#     print('Getting unique alleles...')
-#     candidate_css = unique_to_clade(core_maNT, unanimous_alleles, sample_names,
-#                                  candidate_clades, candidate_clade_names)
-    
-#     # =========================================================================
-#     #  Remove clades without enough csSNPs
-#     # =========================================================================
-    
-#     is_cs_clade = np.count_nonzero(candidate_css,0) > min_cssnps
-    
-#     cssnps_arr = candidate_css[:,is_cs_clade]
-#     clade_names = candidate_clade_names[is_cs_clade]
-    
-#     if np.sum(~is_cs_clade) > 0:
-#         print(f"The following clades had fewer than {min_cssnps} specific SNPs and will be removed:")
-#         for cname in candidate_clade_names[~is_cs_clade]:
-#             print(f"{cname}\n")
-#             # Prune noninformative clades from tree
-#             if path_to_candidate_clades_tree:
-#                 delnode = candidate_clades_tree.search_nodes(name=cname)
-#                 delnode.delete()
-    
-#     # Trim cssnps_arr to just include positions with a csSNP
-#     cssnps = cssnps_arr[np.count_nonzero(cssnps_arr,1) > 0]
-#     cssnp_pos = core_pos[np.count_nonzero(cssnps_arr,1) > 0]
-
-#     # =========================================================================
-#     #  Report results
-#     # =========================================================================
-
-#     print('Classifier results:')
-#     for c in range(len(clade_names)):
-#         print('Clade ' + clade_names[c] + ': ' + str(np.count_nonzero(cssnps[:,c])) + ' csSNPs found')
-    
-#     # =========================================================================
-#     #  Save classifier object
-#     # =========================================================================
-    
-#     with gzip.open(path_to_output_classifier, 'wb') as f:
-        
-#         pickle.dump({'clades':candidate_clades,
-#                      'clade_names':clade_names,
-#                      'cssnps':cssnps,
-#                      'cssnp_pos':cssnp_pos,
-#                      'tree': candidate_clades_tree}, f)
-
-# def read_candidate_clades_file(path_to_candidate_clades):
-#     '''Read in candidate clades .csv file into dict
-
-#     Args:
-#         path_to_candidate_clades (str): .csv file listing candidate clades as 
-#                                         follows: name,genome1,genome2,..,genomeN.
-
-#     Returns:
-#         candidate_clades_dct (dict): Dictionary giving the genomes 
-#                                       belonging to each clade.
-
-#     '''
-#     candidate_clades_dct = {}
-#     clade_names = []
-
-#     with open(path_to_candidate_clades) as f:
-#         for line in f:
-#             ls = line.rstrip(',\n').split(',')
-#             candidate_clades_dct[ls[0]] = ls[1:]
-#             clade_names.append(ls[0])
-        
-#     return candidate_clades_dct, np.array(clade_names)
-    
-    
-def read_clades_file(path_to_clades_file, uncl_marker):
-    '''
-    Read in a clades file.
-    '''        
-    
-    # Get delimiter
-    with open(path_to_clades_file,'r') as file:
-        firstline = file.readline()
-   
-    if len(firstline.strip().split('\t'))==2:
-        dlim='\t'
-    elif len(firstline.strip().split(','))==2:
-        dlim=','
-    
-    # Read in file
-    clade_ids = np.loadtxt(path_to_clades_file, 
-                           delimiter=dlim, 
-                           dtype=str)
-    
-    # Reshape into dictionary
-    clades_dct = dict()
-    clade_names = []
-    # Loop through unique clades & grab samples
-    for clade in np.unique(clade_ids[:,1]):
-        
-        if clade==uncl_marker:
-            continue
-        
-        isclade_bool = np.in1d(clade_ids[:,1], clade)
-        clade_samples = clade_ids[isclade_bool,0].tolist()
-        
-        clades_dct[clade] = clade_samples
-        clade_names.append(clade)
-            
-    return clades_dct, np.array(clade_names)
-
-def rphylip(sample_names):
-    '''Change : to | for consistency with phylip format'''
-    
-    rename = [sam.replace(':','|') for sam in sample_names]
-    
-    return np.array(rename)
-
-    
-    
-# %%
