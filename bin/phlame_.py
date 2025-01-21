@@ -65,7 +65,7 @@ if __name__ == '__main__':
     classify_op.add_argument('-p', dest='outputdata', type=str, default=False, required=False,
                           help='Path to output data file (.pickle.gz)')
     classify_op.add_argument('-m', choices=['bayesian', 'mle'], required=True,
-                             help="Inference algorithm to use (default mle).", default="MLE")
+                             help="Inference algorithm to use (default mle).", default="mle")
     classify_op.add_argument('--max_pi', type=float, default=0.3, required=False,
                           help='Maximum pi value to count a lineage as present.')
     classify_op.add_argument('--min_snps', type=int, default=10, required=False,

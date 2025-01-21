@@ -232,9 +232,9 @@ class Classify:
                 print(f"Fit results for clade: {clade_names[c]}")
                 
                 fit = countsCSS_NEW(cts2model,
-                                        total2model,
-                                        seed=self.seed,
-                                        mode=self.mode)
+                                    total2model,
+                                    seed=self.seed,
+                                    mode=self.mode)
                                                     
                 frequency, prob = fit.fit(max_pi = self.max_pi,
                                           nchain = self.nchain,
@@ -369,6 +369,7 @@ class countsCSS_NEW:
             nchain=10000, 
             nburn=500,
             interval_size=0.95,
+            subsample=True
             ):
         '''
         Fit counts data to model.
@@ -404,6 +405,9 @@ class countsCSS_NEW:
 
             self.counts_MLE = (pi_MLE,lambda_MLE)
 
+            if subsample & (len(self.counts) > 1000):
+                self.counts, self.total_counts = self.subsample_positions(1000)
+                
             try:
                 param_chains, lv_chains = self.ZINB_gibbs_sampler(nchain,
                                                                 nburn)
@@ -413,11 +417,13 @@ class countsCSS_NEW:
                 print('Loglikelihood became too low and triggered an overflow error.\
                     Randomly subsampling positions and trying again...')
                 
-                subsample_idx = np.random.choice(np.arange(0,len(self.counts)),
-                                                int(len(self.counts)/2))
+                # subsample_idx = np.random.choice(np.arange(0,len(self.counts)),
+                #                                 int(len(self.counts)/2))
                 
-                self.counts = self.counts[subsample_idx]
-                self.total_counts = self.total_counts[subsample_idx]
+                # self.counts = self.counts[subsample_idx]
+                # self.total_counts = self.total_counts[subsample_idx]
+
+                self.counts, self.total_counts = self.subsample_positions(int(len(self.counts)/2))
                 
                 param_chains, lv_chains = self.ZINB_gibbs_sampler(nchain,
                                                                 nburn)
@@ -527,7 +533,15 @@ class countsCSS_NEW:
         
         return param_inits, latent_var_inits
 
-    
+    def subsample_positions(self, n):
+        '''
+        Subsample n positions from the counts data.
+        '''
+        
+        idx = np.random.choice(np.arange(0,len(self.counts)), n)
+        
+        return self.counts[idx], self.total_counts[idx]
+        
     def zip_fit_mle(self, cts):
         
         with warnings.catch_warnings():
