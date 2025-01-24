@@ -14,7 +14,6 @@ import sys
 
 import phlame.classify_module as classify
 import phlame.tree_module as tree
-import phlame.helper_functions as helper
 import phlame.make_classifier_module as makedb
 
 #%%
@@ -24,34 +23,45 @@ import phlame.make_classifier_module as makedb
 
 def print_help():
     print('')
-    print('            ...::: PhLAMe v1.0 :::...''')
-    print('       Evan Qu, Lieberman Lab, MIT. 2023\n''')
+    print('            ...::: PHLAME v1.0 :::...''')
+    print('       Evan Qu, Lieberman Lab, MIT. 2025\n''')
     print('Usage: phlame.py [-h] {classify,makedb,tree} ...\n')
     print('''
 Choose one of the operations below for more detailed help.
 Example: phlame classify -h
 
 Main operations:
-    classify ->  Determine lineage-level frequencies within a metagenome using a PhLAMe database
-    makedb   ->  Create a PhLAMe database
-    tree     ->  Identify candidate lineages from a phylogenetic tree
+    classify ->  Estimate metagenomic clade-level frequencies using a PHLAME database.
+    makedb   ->  Create a PHLAME database.
+    tree     ->  Create a phylogenetic tree for a PHLAME database.
 
 Auxiliary operations:
-    TBD
+    plot -> Generate informative plots from classify output.
+    cmt -> Convert aligned pileup files into a candidate mutation table.
             ''')
 
 if __name__ == '__main__':
+
+    # Main help message
+    if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        print_help()
+        sys.exit(0)
+
     
     parser = argparse.ArgumentParser(
                     prog = 'phlame',
                     description = 'What the program does',
-                    epilog = 'Text at the bottom of help')
+                    epilog = 'Text at the bottom of help',
+                    add_help = False)
     
     subparsers = parser.add_subparsers(help='Desired operation',dest='operation')
     
     classify_op = subparsers.add_parser('classify')
     makedb_op = subparsers.add_parser('makedb')
     tree_op = subparsers.add_parser('tree')
+    plot_op = subparsers.add_parser('plot')
+    CMT_op = subparsers.add_parser('cmt')
+
 
     # Classify arguments
     classify_op.add_argument('-i', dest='input', type=str, required=True, 
@@ -94,18 +104,6 @@ if __name__ == '__main__':
                           help='Maximum percentage of Ns for a position to be considered')
     makedb_op.add_argument('--core', type=float, default=0.9, required=False,
                           help='Maximum number of non-Ns across isolates for a position to be considered')
-    makedb_op.add_argument('--outgroup', type=float, default=False, required=False,
-                          help='Maximum number of non-Ns across isolates for a position to be considered')
-
-    # Tree arguments
-    tree_op.add_argument('-i', dest='intree', type=str, required=True, 
-                          help='Path to input phylogeny (Newick format)')
-    tree_op.add_argument('-c', dest='incmt', type=str, default=False, required=False, 
-                          help='Path to input candidate mutation table')
-    tree_op.add_argument('-o', dest='outtree', type=str, required=True, 
-                          help='Path to output called phylogeny (Newick format)')
-    tree_op.add_argument('-p', dest='outclades', type=str, default=False, required=False, 
-                          help='Path to output clade IDs file')
 
     tree_op.add_argument('--min_branch', type=float, default=100, required=False,
                           help='Minimum branch length leading up to a clade')
@@ -113,15 +111,25 @@ if __name__ == '__main__':
                           help='Minimum number of leaves in a clade')
     tree_op.add_argument('--min_support', type=float, default=0.75, required=False,
                           help='Minimum bootstrap support for a clade')
-    tree_op.add_argument('--rescale', required=False,  action='store_true',
-                          help='Scale tree branch lengths to number of core-genome substitutions.')
+    
+    makedb_op.add_argument('--outgroup', type=float, default=False, required=False,
+                          help='Maximum number of non-Ns across isolates for a position to be considered')
+
+    # Tree arguments
+    tree_op.add_argument('-i', dest='intree', type=str, required=True, 
+                          help='Paths to input pileup files, newline separated list')
+    tree_op.add_argument('-c', dest='incmt', type=str, default=False, required=False, 
+                          help='Path to input candidate mutation table')
+    tree_op.add_argument('-p', dest='phylip', type=str, default=False, required=True, 
+                          help='Path to phylip file.')
+    tree_op.add_argument('-o', dest='outtree', type=str, required=False, 
+                          help='Path to output called phylogeny (requires -p specified)')
+    
+    tree_op.add_argument('--rescale', required=False,  action='store_true', default=True
+                          help='Rescale tree branch lengths into # of core-genome substitutions.')
+
 
     args = parser.parse_args()
-    
-    # Main help message
-    if (len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help'):
-            print_help()
-            sys.exit(0)
     
     if args.operation=='classify':
         

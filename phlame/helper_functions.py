@@ -6,6 +6,7 @@ Helper functions and classes for phlame.
 @author: evanqu
 """
 
+import os
 import pickle
 import gzip
 import numpy as np
@@ -115,50 +116,81 @@ class PhlameClassifier():
         # corresponding clade index
         self.allele_cidx = np.nonzero(self.csSNPs)[1]
 
-#Todo: add formal IO errors
-def read_cmt(path_to_cmt_file):
-    '''Read in candidate mutation table from pickled object file.
 
-    Args:
-        path_to_cmt_file (str): String path to candidate mutation table file.
-
-    Returns:
-        sample_names (arr): Array of sample names.
-        pos (TYPE): DESCRIPTION.
-        counts (TYPE): DESCRIPTION.
-        quals (TYPE): DESCRIPTION.
-        indel_counter (TYPE): DESCRIPTION.
-
+class Phylip():
     '''
-    
-    if path_to_cmt_file.endswith('.pickle.gz'):
-        with gzip.open(path_to_cmt_file,'rb') as f:
-            CMT = pickle.load(f)
-    
-    elif path_to_cmt_file.endswith('.pickle'):
-        with open(path_to_cmt_file,'rb') as f:
-            CMT = pickle.load(f)
+    Holds data and methods for a phylip object.
+    '''
 
-            
-    counts = CMT['counts']
-    sample_names = CMT['sample_names']
-    pos = CMT['p']
-    quals=CMT['quals']
-    indel_counter=CMT['indel_counter']
-    if 'in_outgroup' in CMT.keys():
-        in_outgroup=CMT['in_outgroup']
-        if type(in_outgroup[0]) == np.ndarray:
-            in_outgroup = np.array(in_outgroup[0][0].split(' ')).astype(bool)
+    def check_valid(phylip_file):
 
-    else:
-        in_outgroup = np.array([False])
-
-
-    if np.size(counts,axis=0) != 8:
-        print('Transposing counts table...')
-        counts = counts.transpose(1,2,0)
+        if not os.path.exists(phylip_file):
+            return False
         
-    return np.array(sample_names), pos, counts, quals, indel_counter, in_outgroup
+        with open(phylip_file, 'r') as f:
+            line1 = f.readline().strip().split(' ')
+
+        nsamples = int(line1[0])
+        npos = int(line1[1])
+
+        valid_samples = nsamples > 0
+        valid_positions = npos > 0
+
+        return valid_samples and valid_positions
+
+class CMT():
+
+    def read_cmt(self, path_to_cmt_file):
+        '''
+        Read in candidate mutation table from pickled object file.
+        '''
+        
+        if path_to_cmt_file.endswith('.pickle.gz'):
+            with gzip.open(path_to_cmt_file,'rb') as f:
+                CMT = pickle.load(f)
+        
+        elif path_to_cmt_file.endswith('.pickle'):
+            with open(path_to_cmt_file,'rb') as f:
+                CMT = pickle.load(f)
+
+        self.sample_names = CMT['sample_names']
+        self.counts = CMT['counts']
+        self.pos = CMT['p']
+        self.quals=CMT['quals']
+        self.indel_counter=CMT['indel_counter']
+        
+        if not self.indel_counter:
+            self.indel_counter = np.zeros((2,len(self.pos),
+                                           len(self.sample_names)))
+            
+        # Note that 1 -> yes outgroup, 0 -> not outgroup
+        # Makes booleans more confusing I know
+        if 'in_outgroup' in CMT.keys():
+            self.in_outgroup=CMT['in_outgroup']
+            if type(self.in_outgroup[0]) == np.ndarray:
+                self.in_outgroup = np.array(self.in_outgroup[0][0].split(' ')).astype(bool)
+
+        else:
+            self.in_outgroup = np.array([False]*len(self.sample_names))
+
+        # Calculate coverage and indels
+        self.calc_coverage()
+        self.calc_indels_all()
+
+    def calc_coverage(self):
+        '''
+        Calculate coverage for each sample.
+        '''
+        self.coverage = np.sum(self.counts,axis=0)
+
+    def calc_indels_all(self):
+
+        self.indels_all = np.sum(self.indel_counter,axis=0)
+
+    # if np.size(self.counts, axis=0) != 8:
+    #     print('Transposing counts table...')
+    #     self.counts = self.counts.transpose(1,2,0)
+            
 
 def read_clades_file(path_to_clades_file, uncl_marker):
     '''
