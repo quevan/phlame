@@ -153,13 +153,13 @@ class CMT():
             with open(path_to_cmt_file,'rb') as f:
                 CMT = pickle.load(f)
 
-        self.sample_names = CMT['sample_names']
+        self.sample_names = np.array(CMT['sample_names'])
         self.counts = CMT['counts']
         self.pos = CMT['p']
         self.quals=CMT['quals']
         self.indel_counter=CMT['indel_counter']
         
-        if not self.indel_counter:
+        if len(self.indel_counter) == 1:
             self.indel_counter = np.zeros((2,len(self.pos),
                                            len(self.sample_names)))
             

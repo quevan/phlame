@@ -19,14 +19,158 @@ import subprocess
 from Bio import AlignIO
 from Bio import SeqIO
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore")
+    import ete3
+
+
 import phlame.helper_functions as helper
 
 
-
-
 #%% Fxns I want
-    
+
 class Tree():
+
+    def __init__(self, tree_file):
+
+        self.tree = ete3.Tree(tree_file, format=0)
+        # midpoint_root = self.tree.get_midpoint_outgroup()
+        # self.tree.set_outgroup(midpoint_root)
+        self.tree.standardize()
+
+        self.tree_samples = self.tree.get_leaf_names()
+        
+    def readinCMT(self, path_to_cmt):
+        
+        CMT = helper.CMT()
+        CMT.read_cmt(path_to_cmt)
+        
+        sample_names = self.rphylip(CMT.sample_names)
+
+        match_bool = np.in1d(sample_names, self.tree_samples)
+        if np.count_nonzero(match_bool) != len(self.tree_samples):
+            raise Exception('At least one sample from tree not found in candidate mutation table!')
+
+        self.cmt_samples = CMT.sample_names[match_bool]
+        self.cmt_counts = CMT.counts[:,:,match_bool]
+
+    def rescale(self, path_to_cmt):
+        '''
+        Rescale a phylogeny from tree distance to # of SNPs using regression.
+        '''
+
+        self.readinCMT(path_to_cmt)
+        
+        tree_dm = self.tip_tip_distmat()
+
+        maNT, _, _, _ = helper.mant(self.cmt_counts)
+
+        snp_dm = helper.distmat(maNT,
+                                self.cmt_samples)
+        
+        # Flatten distmat into 1D array
+        snp_dists = self.flatten_distmat(snp_dm)
+        tree_dists = self.flatten_distmat(tree_dm)
+        
+        tree_dists = tree_dists[snp_dists>0] # Remove SNP distances of 0
+        snp_dists = snp_dists[snp_dists>0] # Remove SNP distances of 0
+
+        ### Linear regression ###
+        
+        linreg = stats.linregress(tree_dists, snp_dists)
+        
+        if linreg.rvalue < 0.75:
+            print(f"There is a low correlation between branch length and mutational distances: {linreg.rvalue:.2f}." + \
+                  "\nWe do not recommend using the rescaled tree.")
+        
+        ## Plot linear regression
+        fig = self.plot_regression(tree_dists, snp_dists, linreg)
+
+        ### Go through tree and scale all branch lengths ###
+        newtree = self.tree.copy()
+        
+        for node in newtree.traverse(strategy='preorder'):
+            if node.dist is not None:
+                node.dist = (node.dist*linreg.slope)
+                
+        return newtree, fig
+    
+    def flatten_distmat(self, dm):
+        '''
+        Flatten a distance matrix and remove diagonal values.
+        '''
+
+        dm_sorted = self.sort_distmat(dm)
+        dists = dm_sorted.to_numpy().flatten()
+        dists = np.delete(dists, # Remove values on the diagonal
+                              range(0, len(dists), len(dm_sorted) + 1), 0)
+        
+
+        return dists
+
+    def tip_tip_distmat(self):
+        '''
+        Calculate the tip-to-tip distance of every tip on tree.
+        '''
+        dm = np.zeros((len(self.tree),len(self.tree)))
+        
+        names = []  
+        for idx1, leaf1 in enumerate(self.tree.get_leaves()):
+            
+            names.append(leaf1.name)
+            
+            for idx2, leaf2 in enumerate(self.tree.get_leaves()): 
+                
+                dm[idx1, idx2] = self.tree.get_distance(leaf1, leaf2)
+        
+        dm_df = pd.DataFrame(dm, index=names, columns=names)
+        
+        return dm_df
+
+    @staticmethod
+    def plot_regression(xs, ys, linreg):
+        
+        fmt={'fontsize':15,
+            'fontname':'Helvetica'}
+
+        fig, axs = plt.subplots()
+        
+        fig.set_size_inches(5,5)
+
+        axs.scatter(xs, ys, c='k', marker='o', alpha=0.1)
+        axs.plot([0,max(xs)], 
+                 [linreg.intercept,(max(xs)*linreg.slope)+linreg.intercept], color='r')
+        
+        axs.set_xlabel('Tree distances',**fmt)
+        axs.set_ylabel('# core genome mutations', **fmt)
+        axs.tick_params(axis='both', labelsize=12)
+
+        axs.text(0.05, 0.85, f"$r^2$={float(linreg.rvalue):.2f}\np={float(linreg.pvalue):.3e}",
+                 transform=axs.transAxes, fontsize=12)
+        
+        fig.tight_layout()
+
+        return fig
+        
+    @staticmethod
+    def rphylip(sample_names):
+        '''Change : to | for consistency with phylip format'''
+        
+        rename = [sam.replace(':','|') for sam in sample_names]
+        
+        return np.array(rename)    
+    
+    @staticmethod
+    def sort_distmat(dm):
+        
+        dm_sorted = dm.sort_index()
+        dm_sorted = dm_sorted.reindex(sorted(dm_sorted.columns), axis=1)
+        
+        return dm_sorted 
+
+
+class CMT2tree():
     '''
     Main controller of the tree construction step.
 
@@ -48,6 +192,7 @@ class Tree():
                  output_renaming_file,
                  output_tree=False,
                  refGenome_file=False, 
+                 rescale_bool=False,
                  min_cov_to_include=10, 
                  min_maf_for_call=0.9,
                  min_strand_cov_for_call=3, 
@@ -88,6 +233,7 @@ class Tree():
         self.output_tree = output_tree
         self.refGenome_file = refGenome_file
         self.remov_recomb = remov_recomb
+        self.rescale_bool = rescale_bool
 
     def main(self):
 
@@ -95,11 +241,11 @@ class Tree():
         #  First check if just tree building needed
         # =========================================================================
 
-        if helper.Phylip.check_valid(self.output_phylip):
+        if self.output_tree and helper.Phylip.check_valid(self.output_phylip):
             print(f"Valid phylip file found at: {self.output_phylip}.")
             print(f"Building tree with existing file...")
 
-            self.raxml()
+            self.make_tree()
 
             return
         
@@ -128,6 +274,42 @@ class Tree():
 
         self.write_phylip()
 
+        # =========================================================================
+        # Write phylip file
+        # =========================================================================
+
+        if self.output_tree:
+
+            self.make_tree()
+    
+
+    def make_tree(self):
+        '''
+        All steps to build and process tree including raxml, renaming, rescaling.
+        '''
+
+        self.raxml()
+
+        print("Tree built. Renaming phylip names...")
+        self.rename_phylip()
+
+        
+        if self.rescale_bool:
+            print("Rescaling branch lengths into # of mutations...")
+
+            tree_obj = Tree(self.output_tree)
+
+            tree_scaled, fig = tree_obj.rescale(self.input_cmt_file)
+
+            #prepend 'rescaled_' to basename of output_tree
+            rescaled_tree_path = os.path.join(os.path.dirname(self.output_tree),
+                                              'rescaled_'+os.path.basename(self.output_tree))
+            
+            tree_scaled.write(rescaled_tree_path, format=0)
+            
+            fig.savefig(os.path.join(os.path.dirname(self.output_tree),
+                                      'tree_snp_distances_linreg.pdf'), format='pdf')
+
 
     def filter_coverage(self):
         '''
@@ -152,7 +334,6 @@ class Tree():
                                      < float(self.filterby_sample['min_cov_to_include'])] )
         
         include_bool = good_cov_bool & ~self.CMT.in_outgroup
-        
         
         # Rationale is not removing low-cov samples first will mess with other filtering
         self.sample_names = self.CMT.sample_names[include_bool]
@@ -252,7 +433,7 @@ class Tree():
         print(f"{n_goodsamples}/{len(self.sample_names)} samples passed breadth filtering.")
         print("The following samples did not pass breadth filtering:")
         print( self.sample_names[~self.max_fracNs_bool] )
-
+    
     def write_phylip(self):
         
         print("Writing phylip file...")
@@ -265,8 +446,7 @@ class Tree():
         self.good_sample_names = self.sample_names[self.max_fracNs_bool]
 
         # Add 0,1,2,3 to beginning of sample names for phylip format
-        sample_names_4phylip = np.char.add(np.arange(0,len(self.good_sample_names)).astype(str), \
-                                            self.good_sample_names.astype(str)).astype(object)
+        sample_names_4phylip = self.sample_names_phylip(self.good_sample_names)
         
         #.dnapars.fa > for dnapars...deleted later
         self.write_calls_to_fasta(calls_for_tree,
@@ -281,18 +461,19 @@ class Tree():
         subprocess.run(["rm -f " + self.output_phylip+".dnapars.tmp"],shell=True)
 
         # Write object to convert phylip names back at the end
+        self.phylip2names = dict(zip(sample_names_4phylip, self.good_sample_names))
+        
         with open(self.output_renaming_file,'w') as f:
-            for line in range(len(self.good_sample_names)):
-                f.write(f"{sample_names_4phylip[line][:10]}\t{self.good_sample_names[line]}\n")
+            for key, value in self.phylip2names.items():
+                f.write(f"{key}\t{value}\n")
 
     def raxml(self):
         
         print("Running RAxML...")
 
-        # Paths for tree
         working_dir = os.path.dirname(self.output_tree)
         basename = os.path.basename(self.output_tree)
-        
+
         # Run RAxML
         print("Running RAxML as follows: " + 
               "raxmlHPC -s " + 
@@ -308,9 +489,52 @@ class Tree():
                         " -w " + shlex.quote(working_dir) +
                         " -n " + basename + 
                         " -m GTRCAT -p 12345 ", shell=True)
+
+
+    def rename_phylip(self):
+        '''
+        Convert 10chr phylip names in a nwk file into long format.
+        And get away from raxml naming system!
+        '''
+
+        if os.path.exists(self.output_renaming_file):
+            self.phylip2names = dict()
+            with open(self.output_renaming_file) as f:
+                for line in f:
+                    key, value = line.strip().split('\t')
+                    self.phylip2names[key] = value
+
+        if not hasattr(self, 'phylip2names'):
+            raise Exception("Phylip renaming file not found, and names are not stored in current run.")
+
+        # Raxml paths
+        basename = os.path.basename(self.output_tree)
+        raxml_outpath = self.output_tree.replace(basename, 
+                                                 'RAxML_bestTree.'+basename)
         
+        # Replace phylip tree names
+        with open(raxml_outpath) as f:
+            tre=f.read()
+        
+        # Replace with representative isolate name
+        for i in self.phylip2names.keys():
+            tre=tre.replace(i,self.phylip2names[i])
+        
+        # Write out new tree
+        with open(self.output_tree,'w') as f:
+            f.write(tre)
 
+    @staticmethod
+    def sample_names_phylip(sample_names):
+        '''
+        Add 0,1,2,3,4 to beginning of sample names for phylip format.
+        '''
 
+        nums = np.arange(0,len(sample_names)).astype(str)
+        sample_names_4phylip = np.char.add(nums, sample_names.astype(str))
+        
+        return sample_names_4phylip.astype(object)
+    
     @staticmethod
     def idx2nts(calls, missingdata="?"):
         # translate index array to array containing nucleotides
