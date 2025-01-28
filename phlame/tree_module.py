@@ -43,17 +43,16 @@ class Tree():
         
     def readinCMT(self, path_to_cmt):
         
-        CMT = helper.CMT()
-        CMT.read_cmt(path_to_cmt)
-        
+        CMT = helper.CandidateMutationTable(path_to_cmt)
+                
         sample_names = self.rphylip(CMT.sample_names)
 
         match_bool = np.in1d(sample_names, self.tree_samples)
         if np.count_nonzero(match_bool) != len(self.tree_samples):
             raise Exception('At least one sample from tree not found in candidate mutation table!')
 
-        self.cmt_samples = CMT.sample_names[match_bool]
-        self.cmt_counts = CMT.counts[:,:,match_bool]
+        self.CMT_samples = CMT.sample_names[match_bool]
+        self.CMT_counts = CMT.counts[:,:,match_bool]
 
     def rescale(self, path_to_cmt):
         '''
@@ -64,10 +63,10 @@ class Tree():
         
         tree_dm = self.tip_tip_distmat()
 
-        maNT, _, _, _ = helper.mant(self.cmt_counts)
+        maNT, _, _, _ = helper.mant(self.CMT_counts)
 
         snp_dm = helper.distmat(maNT,
-                                self.cmt_samples)
+                                self.CMT_samples)
         
         # Flatten distmat into 1D array
         snp_dists = self.flatten_distmat(snp_dm)
@@ -252,10 +251,8 @@ class CMT2tree():
         # =========================================================================
         #  Read in input files
         # =========================================================================
-        self.CMT = helper.CMT()
+        self.CMT = helper.CandidateMutationTable(self.input_cmt_file)
         
-        self.CMT.read_cmt(self.input_cmt_file)
-
         # =========================================================================
         # Filtering
         # =========================================================================
@@ -305,7 +302,10 @@ class CMT2tree():
             rescaled_tree_path = os.path.join(os.path.dirname(self.output_tree),
                                               'rescaled_'+os.path.basename(self.output_tree))
             
-            tree_scaled.write(rescaled_tree_path, format=0)
+            tree_scaled.write(outfile=rescaled_tree_path, format=0)
+
+            # check that the tree is valid
+            assert os.path.exists(rescaled_tree_path), 'Rescaled tree file not created.'
             
             fig.savefig(os.path.join(os.path.dirname(self.output_tree),
                                       'tree_snp_distances_linreg.pdf'), format='pdf')

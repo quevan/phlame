@@ -138,9 +138,9 @@ class Phylip():
 
         return valid_samples and valid_positions
 
-class CMT():
+class CandidateMutationTable():
 
-    def read_cmt(self, path_to_cmt_file):
+    def __init__(self, path_to_cmt_file):
         '''
         Read in candidate mutation table from pickled object file.
         '''
@@ -197,6 +197,8 @@ def read_clades_file(path_to_clades_file, uncl_marker):
     Read in a clades file.
     '''        
     
+    if not os.path.exists(path_to_clades_file):
+        raise FileNotFoundError(f'File {path_to_clades_file} not found.')
     # Get delimiter
     with open(path_to_clades_file,'r') as file:
         firstline = file.readline()
@@ -205,6 +207,8 @@ def read_clades_file(path_to_clades_file, uncl_marker):
         dlim='\t'
     elif len(firstline.strip().split(','))==2:
         dlim=','
+    else:
+        raise ValueError('Delimiter in clades file not recognized. Please specify clades as a tab or comma separated list.')
     
     # Read in file
     clade_ids = np.loadtxt(path_to_clades_file, 

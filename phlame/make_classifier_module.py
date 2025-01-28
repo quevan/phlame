@@ -6,6 +6,7 @@ Module containing functions to build a PHLAME classifier.
 """
 
 #%%
+import os
 import numpy as np
 import pandas as pd 
 # import h5py
@@ -28,13 +29,18 @@ class MakeDB():
 
     def __init__(self, 
                  path_to_cmt,
-                 path_to_candidate_clades,
+                 path_to_tree,
+                 path_to_output_clades,
                  path_to_output_db,
-                 path_to_candidate_clades_tree=False,
+                 outgroup_str=None,
+                 path_to_input_clades=None,
+                 min_branch_len=1000,
+                 min_nsamples=3,
+                 min_support=0.75,
                  min_cssnps=10,
                  maxn=0.1,
                  core=0.9,
-                 min_maf_for_call=0.75,
+                 min_maf_for_call=0.75, 
                  min_strand_cov_for_call=2,
                  max_qual_for_call=-30,
                  min_presence_core=0.5,
@@ -42,13 +48,20 @@ class MakeDB():
                  ):
 
         self.__path_to_cmt = path_to_cmt
-        self.__path_to_candidate_clades = path_to_candidate_clades
+        self.__path_to_tree = path_to_tree
+        self.path_to_output_clades = path_to_output_clades
         self.__path_to_output_db = path_to_output_db
-        if path_to_candidate_clades_tree:
-            self.__path_to_candidate_clades_tree = path_to_candidate_clades_tree
-        else:
-            self.__path_to_candidate_clades_tree = False
+        
+        self.path_to_input_clades = path_to_input_clades
 
+        self.outgroup_str = outgroup_str
+
+        # Clade calling parameters
+        self.min_branch_len = min_branch_len
+        self.min_nsamples = min_nsamples
+        self.min_support = min_support
+        
+        # Database parameters
         self.min_cssnps = min_cssnps
         self.maxn = maxn
         self.core = core
@@ -59,6 +72,21 @@ class MakeDB():
         self.min_strand_cov_for_call = min_strand_cov_for_call
         self.max_qual_for_call = max_qual_for_call
         self.min_presence_core = min_presence_core
+
+    def readin(self):
+        '''
+        Main function to read in files
+        '''
+
+        
+        self.CMT = helper.CandidateMutationTable(self.__path_to_cmt)
+        
+        self.sample_names = helper.rphylip(self.CMT.sample_names)
+        
+        self.tree = ete3.Tree(self.__path_to_tree, format=0)
+        # midpoint_root = self.tree.get_midpoint_outgroup()
+        # self.tree.set_outgroup(midpoint_root)
+        self.tree.standardize()
             
     def main(self):
         
@@ -66,47 +94,53 @@ class MakeDB():
         # Read in files
         # =========================================================================
         print('Reading in files...')
-        sample_names, pos, counts, quals, _, in_outgroup = helper.read_cmt(self.__path_to_cmt)
-        sample_names = helper.rphylip(sample_names)
-        maNT, maf, _, _ = helper.mant(counts)
+        
+        self.readin()
 
-        coverage_f_strand=counts[0:4,:,:].sum(axis=0) #should be pxs
-        coverage_r_strand=counts[4:8,:,:].sum(axis=0)
+        # =========================================================================
+        # Clade caller
+        # =========================================================================
 
-        candidate_clades, candidate_clade_names = helper.read_clades_file(self.__path_to_candidate_clades,
-                                                                   uncl_marker='-1')
+        if self.path_to_input_clades:
 
-        if self.__path_to_candidate_clades_tree:
-            candidate_clades_tree = ete3.Tree(self.__path_to_candidate_clades_tree, format=1)
-            #1 includes node names
+            print(f'Using information from the following file to define clades:')
+            print(os.path.basename(self.path_to_input_clades))
+            candidate_clades, candidate_clade_names = helper.read_clades_file(self.path_to_input_clades, uncl_marker='-1')
+
         else:
-            candidate_clades_tree = False
+            
+            self.call_clades_check()
+            
+            candidate_clades, candidate_clade_names, new_tree = self.call_clades()
+
+            # Write clade IDs
+            self.write_cladeIDs(candidate_clades,
+                                self.path_to_output_clades)
+        
+        # =========================================================================
+        # maNT calls
+        # =========================================================================
+
+        self.maNT, maf, _, _ = helper.mant(self.CMT.counts)
 
         # =========================================================================
         # Define ingroup and outgroup
         # =========================================================================
 
-        if self.max_outgroup:
-            ingroup = maNT[:,~in_outgroup]
-            ingroup_maf = maf[:,~in_outgroup]
-            ingroup_sample_names = sample_names[~in_outgroup]
-            outgroup = maNT[:,in_outgroup]
-            outgroup_maf = maf[:,in_outgroup]
-            outgroup_sample_names = sample_names[in_outgroup]
+        self.define_outgroup()
         
-        else:
-            ingroup = maNT; ingroup_sample_names = sample_names; ingroup_maf = maf
-            outgroup = np.array([]); outgroup_sample_names = np.array([]); outgroup_maf = np.array([])
-
         # =========================================================================
         # Do pre-filtering of allele calls
         # =========================================================================
 
         # Filter for only core genome positions
-        is_core_genome = np.count_nonzero(ingroup, axis=1)/len(ingroup[1]) >= self.core
-        core_maNT = ingroup[is_core_genome]
-        core_pos = pos[is_core_genome]
-        print(f"Number of core positions: {len(core_pos)}/{len(pos)}")
+        is_core_genome = np.count_nonzero(self.ingroup, axis=1)/len(self.ingroup[1]) >= self.core
+        core_maNT = self.ingroup[is_core_genome]
+        core_pos = self.CMT.pos[is_core_genome]
+        print(f"Number of core positions: {len(core_pos)}/{len(self.CMT.pos)}")
+        if np.count_nonzero(is_core_genome) < len(is_core_genome)/5:
+            print(f'Warning: Less than 20% of positions are core to > {self.core*100}% of samples!')
+            print(f'Consider lowering the core genome threshold or checking the input data.')
 
         # Mask ambiguous allele calls
         calls = np.copy(core_maNT)
@@ -114,9 +148,14 @@ class MakeDB():
         # calls[ ingroup_maf[is_core_genome] < self.min_maf_for_call ] = 0
 
         # Mask samples with too many ambiguous allele calls
-        mask_fracNs = ( ((calls>0).sum(axis=0)/len(calls)) >= self.min_presence_core )
-        print('The following samples have too many ambiguous allele calls and will not be considered:')
-        print('\n'.join(ingroup_sample_names[~mask_fracNs]))
+        fracNs_bool = ( ((calls>0).sum(axis=0)/len(calls)) >= self.min_presence_core )
+        
+        if np.count_nonzero(~fracNs_bool) > 0:
+            print('The following samples have too many ambiguous allele calls and will not be considered:')
+            print('\n'.join(self.ingroup_sample_names[~fracNs_bool]))
+
+        if np.count_nonzero(fracNs_bool) < 2:
+            raise Warning('After filtering, there are fewer than 3 samples!')
 
         # Moving this to inside the unaminous_to_clade function
         # calls = calls[:,mask_fracNs]
@@ -125,21 +164,22 @@ class MakeDB():
         # =========================================================================
         # Get csSNPs for every clade
         # =========================================================================
-                    
+        
         #Call csSNPs
         print('Getting unanimous alleles...')
-        unanimous_alleles = unanimous_to_clade(calls, ingroup_sample_names,
+        unanimous_alleles = unanimous_to_clade(calls, self.ingroup_sample_names,
                                                candidate_clades, candidate_clade_names,
                                                self.maxn, self.min_presence_core)
 
         print('Getting unique alleles...')
-        candidate_css = unique_to_clade(calls, unanimous_alleles, ingroup_sample_names,
+        candidate_css = unique_to_clade(calls, unanimous_alleles, self.ingroup_sample_names,
                                         candidate_clades, candidate_clade_names)
         
         # Remove positions aligning to too many outgroup genomes
-        if len(outgroup_sample_names) > 0:
+        if len(self.outgroup_sample_names) > 0:
             print('Removing positions present in outgroup genomes...')
-            max_outgroup_bool = ( (np.count_nonzero(outgroup, axis=1)/len(outgroup[1])) >= self.max_outgroup )
+            max_outgroup_bool = ( (np.count_nonzero(self.outgroup, axis=1)/len(self.outgroup[1])) 
+                                 >= self.max_outgroup )
 
             candidate_css[max_outgroup_bool[is_core_genome]] = 0
             print(f"Removed {np.count_nonzero(max_outgroup_bool[is_core_genome])}/{len(candidate_css)} positions present >{self.max_outgroup*100}% of outgroup genomes")
@@ -157,11 +197,7 @@ class MakeDB():
             print(f"The following clades had fewer than {self.min_cssnps} specific SNPs and will be removed:")
             for cname in candidate_clade_names[~is_cs_clade]:
                 print(f"{cname}\n")
-                # Prune noninformative clades from tree
-                if self.__path_to_candidate_clades_tree:
-                    delnode = candidate_clades_tree.search_nodes(name=cname)
-                    delnode.delete()
-        
+       
         # Trim cssnps_arr to just include positions with a csSNP
         cssnps = cssnps_arr[np.count_nonzero(cssnps_arr,1) > 0]
         cssnp_pos = core_pos[np.count_nonzero(cssnps_arr,1) > 0]
@@ -183,8 +219,198 @@ class MakeDB():
             pickle.dump({'clades':candidate_clades,
                         'clade_names':clade_names,
                         'cssnps':cssnps,
-                        'cssnp_pos':cssnp_pos,
-                        'tree': candidate_clades_tree}, f)
+                        'cssnp_pos':cssnp_pos}, f)
+
+    def parse_outgroup(self):
+
+        if self.outgroup_str:
+
+            self.outgroup_ls = [item.strip() for item in self.outgroup_str.split(",")]
+            
+            # Check that all outgroup genomes are present in candidate mutation table
+            if not np.array([genome in self.sample_names for genome in self.outgroup_ls]).all():
+                raise Exception('The following outgroup genomes are not present in the candidate mutation table: ' +
+                                ', '.join([genome for genome in self.outgroup_ls if genome not in self.sample_names]))
+            
+            # outgroup_bool = np.in1d(self.sample_names, self.outgroup_ls)
+        
+            # # Check if any outgroup genomes are not in sample_names
+            # if np.sum(outgroup_bool) < len(self.outgroup_ls):
+            #     print('Warning: The following outgroup genomes could not be found in the candidate mutation table. Will proceed anyway. ' +
+            #           '\n'.join([genome for genome in self.outgroup_ls if genome not in self.sample_names]))
+                
+            # if np.sum(outgroup_bool) == 0:
+            #     raise Exception('None of the outgroup genomes given are present!')
+
+        else:
+            self.outgroup_ls = []
+
+
+    def define_outgroup(self):
+
+        self.parse_outgroup()
+        
+        # Define outgroup
+        outgroup_bool = np.in1d(self.sample_names, self.outgroup_ls)
+        
+        if np.sum(outgroup_bool) == 0:
+            self.ingroup = self.maNT
+            self.ingroup_sample_names = self.sample_names
+            self.outgroup = np.array([])
+            self.outgroup_sample_names = np.array([])
+        
+        else:
+            self.ingroup = self.maNT[:,~outgroup_bool]
+            self.ingroup_sample_names = self.sample_names[~outgroup_bool]
+            self.outgroup = self.maNT[:,outgroup_bool]
+            self.outgroup_sample_names = self.sample_names[outgroup_bool]
+
+
+    def call_clades_check(self):
+        '''
+        Check that the parameters passed to call_clades make sense
+        '''
+
+        dists = []
+        for node in self.tree.traverse("preorder"):
+            dists.append(node.dist)
+
+        if self.min_branch_len > max(dists):
+            raise IOError(f'Minimum branch length threshold ({self.min_branch_len}) is longer than the longest branch in the tree!')
+        
+        if len(self.tree.get_leaf_names()) < self.min_nsamples*2:
+            raise IOError(f"There are fewer than {self.min_nsamples} samples in the tree. It will not be possible to call more than one clade (Minimum number of samples in a clade is {self.min_nsamples}).")
+        
+
+    def call_clades(self):
+        '''
+        Call candidate clades for every branch of tree passing thresholds.
+        '''
+        
+        # Initialize outputs
+        good_nodes=[] # candidate clades
+        clade_name=[] # name of candidate clade
+        tips_sets=[]; tips_ls=[] # isolates defining clades
+        
+        #Go through nodes 
+        for node in self.tree.traverse("preorder"):
+            
+            # Cut clades at long enough branch lengths and bootstrap values
+            if node.is_leaf() is False and node.dist is not None \
+                and node.dist >= self.min_branch_len \
+                and len(node.get_leaves()) >= self.min_nsamples \
+                and node.support >= self.min_support:
+                
+                
+                good_nodes.append(node) # Save node object
+                
+                clade_name.append('tmp') # Create temp. name for naming function
+                
+                leaf_names = []
+                for leaf in node.iter_leaves():
+                    leaf_names.append(leaf.name)
+                
+                tips_sets.append(set(leaf_names)) # Save tip names as a set
+                
+                tips_ls.append(leaf_names)
+
+        def fill_clade_names(parent, parent_name):
+            '''
+            Name daughter clades iteratively according to their parent 
+            and create tree object reflecting structure.
+            
+            Naming follows this logic:
+            1. Starting at the root, find the first daughter node (dnode) for 
+            which dnode is a subset of the parent and only the parent 
+            (i.e an immediate descendant)
+            2. Name it with 'parent_name'.1
+            3. Recur onto dnode (first daughter of 'parent'.1 will be 'parent'.1.1)
+            4. Then increase number (1->2)
+            5. Find the next dnode for which dnode is a subset of the parent 
+            and only the parent. (i.e. sister to 'parent_name'.1). These will 
+            thus be named 'parent'.2, 'parent'.3, etc.
+            6. Continue until all names are filled
+                
+            '''
+            number=1
+            # Iterate through goodnodes
+            for i in range(len(tips_sets)):
+                
+                # Is this goodnode a subset of the parent and only the parent?
+                if tips_sets[i].issubset(parent) \
+                    and sum([tips_sets[i].issubset(tips_sets[c]) for c in range(len(tips_sets)) if clade_name[c] == 'tmp']) == 1: 
+                    #^ugly
+                        
+                    # Name it the parent name + number
+                    clade_name[i] = parent_name + '.' + str(number)
+                    # Then, recur onto this node
+                    fill_clade_names(tips_sets[i], clade_name[i])
+                    # Then increase number
+                    number = number+1
+                
+        # Begin at the root
+        fill_clade_names(set(self.tree.get_leaf_names()), 'C')
+        
+        #### Create ete3 graph structure from clade names ####
+        # Note that this is NOT a binary tree and can have multifurcations + internal nodes    
+        # graph = ete3.Tree()
+        # for name in clade_name:
+        #     # If clade is a direct descendant from root
+        #     if name.rsplit('.', 1)[0] == 'C':
+        #         # Add clade as child of root
+        #         graph.add_child(name=name)
+        #     # If there is another ancestor
+        #     else:
+        #         # Search for the ancestor and add clade as a child of that
+        #         graph.search_nodes(name=name.rsplit('.', 1)[0])[0].add_child(name=name)
+    
+    
+        # Make clades dict object
+        clades = {}
+        for name, tips in zip(clade_name, tips_ls):
+            clades[name] = tips
+
+        # Annotate phylogenetic tree with updated clade names
+        new_tree = self.tree.copy()
+        for new_node in new_tree.traverse('preorder'):
+            if not new_node.is_leaf():
+                new_node_tips = new_node.get_leaf_names()
+                #Do tips of this node match good_nodes?
+                if new_node_tips in tips_ls:
+                    # print("match")
+                    new_node.name = clade_name[tips_ls.index(new_node_tips)]
+                else:
+                    new_node.name=None
+
+
+        return clades, np.array(clade_name), new_tree
+    
+    @staticmethod
+    def write_cladeIDs(clades, output_file):
+        '''
+        Write clade_IDs file as .tsv
+        '''
+        
+        with open(output_file, 'w') as f:
+            for clade_name, tips in zip(clades.keys(), clades.values()):
+                for tip in tips:
+                    f.write(f"{tip}\t{clade_name}\n")
+    
+    def write_tree(self, tree):
+        '''
+        Write called tree to newick format
+        '''
+        with open(self.__path_to_out_tree,'w') as f:
+            f.write(tree.write(format=1)) #1 includes node names
+
+    @staticmethod
+    def rphylip(sample_names):
+        '''Change : to | for consistency with phylip format'''
+        
+        rename = [sam.replace(':','|') for sam in sample_names]
+        
+        return np.array(rename)    
+
         
 def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, min_presence_core):
     '''For a list of clades defined by their daughter genomes, return all alleles
@@ -300,323 +526,175 @@ def unique_to_clade(maNT, unanimous_alleles, sample_names, candidate_clades, cla
     return css_mat
 
 
-class CladeCaller():
-    '''
-    Main controller of the Tree step.
-    '''
+# class CladeCaller():
+#     '''
+#     Main controller of the Tree step.
+#     '''
     
-    def __init__(self, path_to_nwk_file,
-                 path_to_out_tree,
-                 path_to_out_cladeIDs,
-                 min_branch_len=100,
-                 min_nsamples=3,
-                 min_support=0.75,
-                 path_to_cmt_file=False,
-                 rescale=False):
+#     def __init__(self, path_to_nwk_file,
+#                  path_to_out_tree,
+#                  path_to_out_cladeIDs,
+#                  min_branch_len=100,
+#                  min_nsamples=3,
+#                  min_support=0.75,
+#                  path_to_cmt_file=False,
+#                  rescale=False):
         
-        self.__path_to_nwk = path_to_nwk_file
-        self.__path_to_cmt = path_to_cmt_file
-        self.__path_to_out_cladeIDs = path_to_out_cladeIDs
-        self.__path_to_out_tree = path_to_out_tree
+#         self.__path_to_out_cladeIDs = path_to_out_cladeIDs
+#         self.__path_to_out_tree = path_to_out_tree
         
-        self.min_branch_len = min_branch_len
-        self.min_nsamples = min_nsamples
-        self.min_support = min_support
+#         self.min_branch_len = min_branch_len
+#         self.min_nsamples = min_nsamples
+#         self.min_support = min_support
         
-        self.rescale_bool = rescale
+#         self.rescale_bool = rescale
         
-        if min_support > 1 or min_support < 0:
-            raise IOError('Branch support threshold must be between 0 and 1!')
+#         if min_support > 1 or min_support < 0:
+#             raise IOError('Branch support threshold must be between 0 and 1!')
         
-        if rescale:
-            if not path_to_cmt_file:
-                raise IOError('Rescaling a tree requires a candidate mutation table!')
+#         if rescale:
+#             if not path_to_cmt_file:
+#                 raise IOError('Rescaling a tree requires a candidate mutation table!')
                 
-    def main(self):
+#     def main(self):
         
-        # =====================================================================
-        #  Load Data
-        # =====================================================================
-        print("Reading in file(s)...")
+#         print("Calling clades...")
 
-        self.tree = ete3.Tree(self.__path_to_nwk, format=0)
-        # midpoint_root = self.tree.get_midpoint_outgroup()
-        # self.tree.set_outgroup(midpoint_root)
-        self.tree.standardize()
-
-        self.tree_samples = self.tree.get_leaf_names()
+#         clades, clade_names, clade_tips, called_tree = self.clade_caller()
         
-        if self.__path_to_cmt:
-            sample_names, _, counts, _, _, _ = helper.read_cmt(self.__path_to_cmt)
-            sample_names = self.rphylip(sample_names)
+#         self.clade_names = clade_names
+#         self.clade_tips = clade_tips
+#         self.called_tree = called_tree
+    
+#         # Do the writing in the controller
+#         # print("Writing...")
+#         # self.write_cladeIDs()
+#         # self.write_tree(self.called_tree)
 
-            match_bool = np.in1d(sample_names, self.tree_samples)
-            if np.count_nonzero(match_bool) != len(self.tree_samples):
-                raise Exception('At least one sample from tree not found in candidate mutation table!')
 
-            self.cmt_samples = sample_names[match_bool]
-            self.counts = counts[:,:,match_bool]
+#     def clade_caller(self):
+#         '''
+#         Call candidate clades for every branch of tree passing thresholds.
+#         '''
+        
+#         # Initialize outputs
+#         good_nodes=[] # candidate clades
+#         clade_name=[] # name of candidate clade
+#         tips_sets=[]; tips_ls=[] # isolates defining clades
+        
+#         #Go through nodes 
+#         for node in self.tree.traverse("preorder"):
             
-        # =====================================================================
-        #  Clade calling step
-        # =====================================================================
+#             # Cut clades at long enough branch lengths and bootstrap values
+#             if node.is_leaf() is False and node.dist is not None \
+#                 and node.dist >= self.min_branch_len \
+#                 and len(node.get_leaves()) >= self.min_nsamples \
+#                 and node.support >= self.min_support:
+                
+                
+#                 good_nodes.append(node) # Save node object
+                
+#                 clade_name.append('tmp') # Create temp. name for naming function
+                
+#                 leaf_names = []
+#                 for leaf in node.iter_leaves():
+#                     leaf_names.append(leaf.name)
+                
+#                 tips_sets.append(set(leaf_names)) # Save tip names as a set
+                
+#                 tips_ls.append(leaf_names)
 
-        if self.rescale_bool:
+#         def fill_clade_names(parent, parent_name):
+#             '''
+#             Name daughter clades iteratively according to their parent 
+#             and create tree object reflecting structure.
             
-            print("Rescaling...")
-
-            scaled_tree, fig = self.rescale()
-            
-            fig.savefig('tree_linreg_output.pdf',format='pdf')
-            
-            print("Writing...")
-                                    
-            self.write_tree(scaled_tree)
-
-        else:
-            print("Calling clades...")
-
-            clades, clade_names, clade_tips, called_tree = self.clade_caller()
-            
-            self.clade_names = clade_names
-            self.clade_tips = clade_tips
-            self.called_tree = called_tree
-        
-            print("Writing...")
+#             Naming follows this logic:
+#             1. Starting at the root, find the first daughter node (dnode) for 
+#             which dnode is a subset of the parent and only the parent 
+#             (i.e an immediate descendant)
+#             2. Name it with 'parent_name'.1
+#             3. Recur onto dnode (first daughter of 'parent'.1 will be 'parent'.1.1)
+#             4. Then increase number (1->2)
+#             5. Find the next dnode for which dnode is a subset of the parent 
+#             and only the parent. (i.e. sister to 'parent_name'.1). These will 
+#             thus be named 'parent'.2, 'parent'.3, etc.
+#             6. Continue until all names are filled
                 
-            self.write_cladeIDs()
-                    
-            self.write_tree(self.called_tree)
-        
-        # if self.__path_to_out_tree_simplified:
-        #     with open(path_to_cladestree_simplified_out,'w') as f:
-        #         f.write(clades.write(format=1)) #1 includes node names
-
-
-    def clade_caller(self):
-        '''
-        Call candidate clades for every branch of tree passing thresholds.
-        '''
-        
-        # Initialize outputs
-        good_nodes=[] # candidate clades
-        clade_name=[] # name of candidate clade
-        tips_sets=[]; tips_ls=[] # isolates defining clades
-        
-        #Go through nodes 
-        for node in self.tree.traverse("preorder"):
-            
-            # Cut clades at long enough branch lengths and bootstrap values
-            if node.is_leaf() is False and node.dist is not None \
-                and node.dist >= self.min_branch_len \
-                and len(node.get_leaves()) >= self.min_nsamples \
-                and node.support >= self.min_support:
+#             '''
+#             number=1
+#             # Iterate through goodnodes
+#             for i in range(len(tips_sets)):
                 
-                
-                good_nodes.append(node) # Save node object
-                
-                clade_name.append('tmp') # Create temp. name for naming function
-                
-                leaf_names = []
-                for leaf in node.iter_leaves():
-                    leaf_names.append(leaf.name)
-                
-                tips_sets.append(set(leaf_names)) # Save tip names as a set
-                
-                tips_ls.append(leaf_names)
-
-        def fill_clade_names(parent, parent_name):
-            '''
-            Name daughter clades iteratively according to their parent 
-            and create tree object reflecting structure.
-            
-            Naming follows this logic:
-            1. Starting at the root, find the first daughter node (dnode) for 
-            which dnode is a subset of the parent and only the parent 
-            (i.e an immediate descendant)
-            2. Name it with 'parent_name'.1
-            3. Recur onto dnode (first daughter of 'parent'.1 will be 'parent'.1.1)
-            4. Then increase number (1->2)
-            5. Find the next dnode for which dnode is a subset of the parent 
-            and only the parent. (i.e. sister to 'parent_name'.1). These will 
-            thus be named 'parent'.2, 'parent'.3, etc.
-            6. Continue until all names are filled
-                
-            '''
-            number=1
-            # Iterate through goodnodes
-            for i in range(len(tips_sets)):
-                
-                # Is this goodnode a subset of the parent and only the parent?
-                if tips_sets[i].issubset(parent) \
-                    and sum([tips_sets[i].issubset(tips_sets[c]) for c in range(len(tips_sets)) if clade_name[c] == 'tmp']) == 1: 
-                    #^ugly
+#                 # Is this goodnode a subset of the parent and only the parent?
+#                 if tips_sets[i].issubset(parent) \
+#                     and sum([tips_sets[i].issubset(tips_sets[c]) for c in range(len(tips_sets)) if clade_name[c] == 'tmp']) == 1: 
+#                     #^ugly
                         
-                    # Name it the parent name + number
-                    clade_name[i] = parent_name + '.' + str(number)
-                    # Then, recur onto this node
-                    fill_clade_names(tips_sets[i], clade_name[i])
-                    # Then increase number
-                    number = number+1
+#                     # Name it the parent name + number
+#                     clade_name[i] = parent_name + '.' + str(number)
+#                     # Then, recur onto this node
+#                     fill_clade_names(tips_sets[i], clade_name[i])
+#                     # Then increase number
+#                     number = number+1
                 
-        # Begin at the root
-        fill_clade_names(set(self.tree.get_leaf_names()), 'C')
+#         # Begin at the root
+#         fill_clade_names(set(self.tree.get_leaf_names()), 'C')
         
-        #### Create ete3 graph structure from clade names ####
-        # Note that this is NOT a binary tree and can have multifurcations + internal nodes    
-        clades = ete3.Tree()
-        for name in clade_name:
-            # If clade is a direct descendant from root
-            if name.rsplit('.', 1)[0] == 'C':
-                # Add clade as child of root
-                clades.add_child(name=name)
-            # If there is another ancestor
-            else:
-                # Search for the ancestor and add clade as a child of that
-                clades.search_nodes(name=name.rsplit('.', 1)[0])[0].add_child(name=name)
+#         #### Create ete3 graph structure from clade names ####
+#         # Note that this is NOT a binary tree and can have multifurcations + internal nodes    
+#         clades = ete3.Tree()
+#         for name in clade_name:
+#             # If clade is a direct descendant from root
+#             if name.rsplit('.', 1)[0] == 'C':
+#                 # Add clade as child of root
+#                 clades.add_child(name=name)
+#             # If there is another ancestor
+#             else:
+#                 # Search for the ancestor and add clade as a child of that
+#                 clades.search_nodes(name=name.rsplit('.', 1)[0])[0].add_child(name=name)
     
     
-        #### Annotate phylogenetic tree with updated clade names ####
-        new_tree = self.tree.copy()
-        for new_node in new_tree.traverse('preorder'):
-            if not new_node.is_leaf():
-                new_node_tips = new_node.get_leaf_names()
-                #Do tips of this node match good_nodes?
-                if new_node_tips in tips_ls:
-                    # print("match")
-                    new_node.name = clade_name[tips_ls.index(new_node_tips)]
-                else:
-                    new_node.name=None
+#         #### Annotate phylogenetic tree with updated clade names ####
+#         new_tree = self.tree.copy()
+#         for new_node in new_tree.traverse('preorder'):
+#             if not new_node.is_leaf():
+#                 new_node_tips = new_node.get_leaf_names()
+#                 #Do tips of this node match good_nodes?
+#                 if new_node_tips in tips_ls:
+#                     # print("match")
+#                     new_node.name = clade_name[tips_ls.index(new_node_tips)]
+#                 else:
+#                     new_node.name=None
                     
                     
-        return clades, clade_name, tips_ls, new_tree
-        
-    def rescale(self):
-        '''
-        Rescale a phylogeny from tree distance to # of SNPs using regression.
-        '''
-        
-        tree_dm = self.tip_tip_distmat()
-
-        maNT, _, _, _ = helper.mant(self.counts)
-
-        snp_dm = helper.distmat(maNT,
-                                self.cmt_samples)
-        
-        # Sort by rows AND columns
-        tree_dm_sorted = self.sort_distmat(tree_dm)
-        snp_dm_sorted = self.sort_distmat(snp_dm)
-    
-        # Flatten array
-        snp_dists = snp_dm_sorted.to_numpy().flatten()
-        snp_dists = np.delete(snp_dists, # Remove values on the diagonal
-                              range(0, len(snp_dists), len(snp_dm_sorted) + 1), 0)
-
-        tree_dists = tree_dm_sorted.to_numpy().flatten()
-        tree_dists = np.delete(tree_dists, 
-                               range(0, len(tree_dists), len(tree_dm_sorted) + 1), 0)
-        
-        tree_dists = tree_dists[snp_dists>0] # Remove SNP distances of 0
-        snp_dists = snp_dists[snp_dists>0] # Remove SNP distances of 0
-
-        ### Linear regression ###
-        tree_dists_transform = tree_dists[:,np.newaxis]
-        slope, _, _, _ = np.linalg.lstsq(tree_dists_transform, snp_dists)
-
-        snp_dists_pred = slope * tree_dists
-        
-        # Calculate the total sum of squares (SS_tot) and the residual sum of squares (SS_res)
-        ss_tot = np.sum((snp_dists - np.mean(snp_dists))**2)
-        ss_res = np.sum((snp_dists - snp_dists_pred)**2)
-
-        # Calculate R^2
-        rsq = 1 - (ss_res / ss_tot)
-
-        ## Plot linear regression
-        fig = self.plot_regression(tree_dists, snp_dists, float(slope), float(rsq))
-
-        ### Go through tree and scale all branch lengths ###
-        newtree = self.tree.copy()
-        
-        for node in newtree.traverse(strategy='preorder'):
-            if node.dist is not None:
-                node.dist = (node.dist*slope)
-                
-        return newtree, fig
-    
-    def tip_tip_distmat(self):
-        '''
-        Calculate the tip-to-tip distance of every tip on tree.
-        '''
-        dm = np.zeros((len(self.tree),len(self.tree)))
-        
-        names = []  
-        for idx1, leaf1 in enumerate(self.tree.get_leaves()):
+#         return clades, np.array(clade_name), tips_ls, new_tree
             
-            names.append(leaf1.name)
-            
-            for idx2, leaf2 in enumerate(self.tree.get_leaves()): 
-                
-                dm[idx1, idx2] = self.tree.get_distance(leaf1, leaf2)
+#     def write_cladeIDs(self):
+#         '''
+#         Write clade_IDs file as .tsv
+#         '''
         
-        dm_df = pd.DataFrame(dm, index=names, columns=names)
-        
-        return dm_df
-
-    def write_cladeIDs(self):
-        '''
-        Write clade_IDs file as .tsv
-        '''
-        
-        with open(self.__path_to_out_cladeIDs, 'w') as f:
-            for name, tips in zip(self.clade_names, self.clade_tips):
-                for tip in tips:
-                    f.write(f"{tip}\t{name}\n")
+#         with open(self.__path_to_out_cladeIDs, 'w') as f:
+#             for name, tips in zip(self.clade_names, self.clade_tips):
+#                 for tip in tips:
+#                     f.write(f"{tip}\t{name}\n")
     
-    def write_tree(self, tree):
-        '''
-        Write called tree to newick format
-        '''
-        with open(self.__path_to_out_tree,'w') as f:
-            f.write(tree.write(format=1)) #1 includes node names
+#     def write_tree(self, tree):
+#         '''
+#         Write called tree to newick format
+#         '''
+#         with open(self.__path_to_out_tree,'w') as f:
+#             f.write(tree.write(format=1)) #1 includes node names
 
-    @staticmethod
-    def plot_regression(xs, ys, slope, rsq):
+#     @staticmethod
+#     def rphylip(sample_names):
+#         '''Change : to | for consistency with phylip format'''
         
-        fmt={'fontsize':15,
-            'fontname':'Helvetica'}
-
-        fig, axs = plt.subplots()
+#         rename = [sam.replace(':','|') for sam in sample_names]
         
-        axs.scatter(xs, ys, c='k', marker='o', alpha=0.1)
-        axs.plot([0,max(xs)], [0,max(xs)*slope], color='r')
-        
-        axs.set_xlabel('Tree distances',**fmt)
-        axs.set_ylabel('# Core genome SNPs', **fmt)
-        axs.tick_params(axis='both', labelsize=12)
-
-        axs.text(0.05, 0.85, f"y={float(slope):.2f}x\nr^2={float(rsq):.2f}",
-                 transform=axs.transAxes, fontsize=12)
-        
-        fig.tight_layout()
-
-        return fig
-        
-    @staticmethod
-    def rphylip(sample_names):
-        '''Change : to | for consistency with phylip format'''
-        
-        rename = [sam.replace(':','|') for sam in sample_names]
-        
-        return np.array(rename)    
+#         return np.array(rename)    
     
-    @staticmethod
-    def sort_distmat(dm):
-        
-        dm_sorted = dm.sort_index()
-        dm_sorted = dm_sorted.reindex(sorted(dm_sorted.columns), axis=1)
-        
-        return dm_sorted 
 
 def map_4_repisolates(path_to_candidate_clades, 
                       path_to_cluster_IDs):
