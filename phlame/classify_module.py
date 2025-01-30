@@ -39,9 +39,9 @@ class Classify:
     they appear in the PhLAMe classifier OR custom group genomes 
     into clades in a 2 column .tsv {genomeID, cladeID}.\n
     
-    path_to_output_frequencies (str): Path to output frequencies file.\n
+    path_to_frequencies (str): Path to output frequencies file.\n
     
-    path_to_output_data (str, optional): If True, outputs a data file 
+    path_to_data (str, optional): If True, outputs a data file 
     with counts and modeling information at the defined level.
     Defaults to False.\n
     
@@ -54,10 +54,12 @@ class Classify:
     
     '''
     
-    def __init__(self, path_to_cts_file, path_to_classifier,
-                 path_to_output_frequencies,
+    def __init__(self,
+                 path_to_cts_file,
+                 path_to_classifier,
+                 path_to_frequencies,
                  level_input=False,
-                 path_to_output_data=False,
+                 path_to_data=False,
                  mode='mle',
                  min_snps=10, max_pi=0.3, min_prob=0.5, min_hpd=0.1,
                  nchain=10000, perc_burn=0.1, seed=False, verbose=True):
@@ -65,8 +67,8 @@ class Classify:
         self.__path_to_counts_file = path_to_cts_file
         self.__classifier_file = path_to_classifier
         self.__levels_input = level_input
-        self.__output_freqs_file = path_to_output_frequencies
-        self.__output_data_file = path_to_output_data
+        self.__output_freqs_file = path_to_frequencies
+        self.__output_data_file = path_to_data
 
         self.max_pi = max_pi
         self.min_snps = min_snps

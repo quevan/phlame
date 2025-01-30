@@ -186,11 +186,13 @@ class CMT2tree():
 
     '''
 
-    def __init__(self, input_cmt_file, 
-                 output_phylip,
-                 output_renaming_file,
-                 output_tree=False,
-                 refGenome_file=False, 
+    def __init__(self, 
+                 input_cmt_file=None,
+                 input_phylip=None,
+                 output_phylip=None,
+                 output_renaming_file=None,
+                 output_tree=None,
+                 refGenome_file=None, 
                  rescale_bool=False,
                  min_cov_to_include=10, 
                  min_maf_for_call=0.9,
@@ -200,7 +202,7 @@ class CMT2tree():
                  min_median_cov_samples=3,
                  max_frac_ambiguous_pos=0.05,
                  max_mean_copynum=2.5,
-                 remov_recomb=False):
+                 remov_recomb=None):
         
 
         self.filterby_sample = {\
@@ -227,21 +229,50 @@ class CMT2tree():
                                     }
         
         self.input_cmt_file = input_cmt_file
+        self.input_phylip = input_phylip
         self.output_phylip = output_phylip
         self.output_renaming_file = output_renaming_file
         self.output_tree = output_tree
         self.refGenome_file = refGenome_file
-        self.remov_recomb = remov_recomb
         self.rescale_bool = rescale_bool
+        self.remov_recomb = remov_recomb
 
+        if self.remov_recomb:
+            print('Warning: Recombination filtering is not currently implemented. Continuing without filtering.')
+
+
+        # Require either input or output phylip file
+        if not self.input_phylip and not self.output_phylip:
+            raise Exception("Path to a phylip file must be specified as either an input or output.")
+        
+        if self.input_phylip and self.output_phylip:
+            raise Exception("Cannot specify both input and output phylip file.")
+        
+        # For raxml
+        if self.input_phylip:
+            self.phylip = self.input_phylip
+        elif self.output_phylip:
+            self.phylip = self.output_phylip
+        
+        # If output phylip file, also require output renaming file and input CMT file
+        if self.output_phylip and not (self.output_renaming_file and self.input_cmt_file):
+            if not self.output_renaming_file:
+                raise Exception("Path to a renaming file must be specified when output phylip file is specified.")
+            if not self.input_cmt_file:
+                raise Exception("Path to a candidate mutation table must be specified when output phylip file is specified.")
+            
+        # If input phylip file, require output tree file
+        if self.input_phylip and not self.output_tree:
+            raise Exception("Path to an output tree file must be specified when input phylip file is specified.")
+            
     def main(self):
 
         # =========================================================================
         #  First check if just tree building needed
         # =========================================================================
 
-        if self.output_tree and helper.Phylip.check_valid(self.output_phylip):
-            print(f"Valid phylip file found at: {self.output_phylip}.")
+        if self.input_phylip and helper.Phylip.check_valid(self.input_phylip):
+            print(f"Valid phylip file found at: {self.input_phylip}.")
             print(f"Building tree with existing file...")
 
             self.make_tree()
@@ -269,10 +300,12 @@ class CMT2tree():
         # Write phylip file
         # =========================================================================
 
-        self.write_phylip()
+        if self.output_phylip:
+            
+            self.write_phylip()
 
         # =========================================================================
-        # Write phylip file
+        # If output_tree is True, build tree
         # =========================================================================
 
         if self.output_tree:
@@ -474,17 +507,20 @@ class CMT2tree():
         working_dir = os.path.dirname(self.output_tree)
         basename = os.path.basename(self.output_tree)
 
+        print(shlex.quote(working_dir))
+        print(shlex.quote(basename))
+
         # Run RAxML
         print("Running RAxML as follows: " + 
               "raxmlHPC -s " + 
-                        shlex.quote(self.output_phylip) + 
+                        shlex.quote(self.phylip) + 
                         " -N 1" + 
                         " -w " + shlex.quote(working_dir) +
                         " -n " + basename + 
                         " -m GTRCAT -p 12345 ")
         
         subprocess.run("raxmlHPC -s " + 
-                        shlex.quote(self.output_phylip) + 
+                        shlex.quote(self.phylip) + 
                         " -N 1" + 
                         " -w " + shlex.quote(working_dir) +
                         " -n " + basename + 
@@ -497,17 +533,7 @@ class CMT2tree():
         And get away from raxml naming system!
         '''
 
-        if os.path.exists(self.output_renaming_file):
-            self.phylip2names = dict()
-            with open(self.output_renaming_file) as f:
-                for line in f:
-                    key, value = line.strip().split('\t')
-                    self.phylip2names[key] = value
-
-        if not hasattr(self, 'phylip2names'):
-            raise Exception("Phylip renaming file not found, and names are not stored in current run.")
-
-        # Raxml paths
+        # Read in RAxML tree
         basename = os.path.basename(self.output_tree)
         raxml_outpath = self.output_tree.replace(basename, 
                                                  'RAxML_bestTree.'+basename)
@@ -515,6 +541,25 @@ class CMT2tree():
         # Replace phylip tree names
         with open(raxml_outpath) as f:
             tre=f.read()
+
+
+        if not self.output_renaming_file:
+            print("No renaming file specified. Continuing without renaming samples...")
+
+            with open(self.output_tree,'w') as f:
+                f.write(tre)
+
+            return
+        
+        if os.path.exists(self.output_renaming_file):
+            self.phylip2names = dict()
+            with open(self.output_renaming_file) as f:
+                for line in f:
+                    key, value = line.strip().split('\t')
+                    self.phylip2names[key] = value
+
+        else:
+            raise Exception("Renaming file not found. Exiting...")
         
         # Replace with representative isolate name
         for i in self.phylip2names.keys():

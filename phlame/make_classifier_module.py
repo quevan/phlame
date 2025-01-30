@@ -34,16 +34,16 @@ class MakeDB():
                  path_to_output_db,
                  outgroup_str=None,
                  path_to_input_clades=None,
-                 min_branch_len=1000,
+                 min_branch_len=100,
                  min_nsamples=3,
                  min_support=0.75,
-                 min_cssnps=10,
+                 min_snps=10,
                  maxn=0.1,
                  core=0.9,
                  min_maf_for_call=0.75, 
                  min_strand_cov_for_call=2,
                  max_qual_for_call=-30,
-                 min_presence_core=0.5,
+                 max_frac_ambiguous=0.5,
                  max_outgroup=False
                  ):
 
@@ -62,7 +62,7 @@ class MakeDB():
         self.min_support = min_support
         
         # Database parameters
-        self.min_cssnps = min_cssnps
+        self.min_snps = min_snps
         self.maxn = maxn
         self.core = core
 
@@ -71,14 +71,13 @@ class MakeDB():
         self.min_maf_for_call = min_maf_for_call
         self.min_strand_cov_for_call = min_strand_cov_for_call
         self.max_qual_for_call = max_qual_for_call
-        self.min_presence_core = min_presence_core
+        self.max_frac_ambiguous = max_frac_ambiguous
 
     def readin(self):
         '''
         Main function to read in files
         '''
 
-        
         self.CMT = helper.CandidateMutationTable(self.__path_to_cmt)
         
         self.sample_names = helper.rphylip(self.CMT.sample_names)
@@ -148,7 +147,7 @@ class MakeDB():
         # calls[ ingroup_maf[is_core_genome] < self.min_maf_for_call ] = 0
 
         # Mask samples with too many ambiguous allele calls
-        fracNs_bool = ( ((calls>0).sum(axis=0)/len(calls)) >= self.min_presence_core )
+        fracNs_bool = ( ((calls>0).sum(axis=0)/len(calls)) >= self.max_frac_ambiguous )
         
         if np.count_nonzero(~fracNs_bool) > 0:
             print('The following samples have too many ambiguous allele calls and will not be considered:')
@@ -165,11 +164,14 @@ class MakeDB():
         # Get csSNPs for every clade
         # =========================================================================
         
+        print(len(self.sample_names))
+        print(len(self.ingroup_sample_names))
+
         #Call csSNPs
         print('Getting unanimous alleles...')
         unanimous_alleles = unanimous_to_clade(calls, self.ingroup_sample_names,
                                                candidate_clades, candidate_clade_names,
-                                               self.maxn, self.min_presence_core)
+                                               self.maxn, self.max_frac_ambiguous)
 
         print('Getting unique alleles...')
         candidate_css = unique_to_clade(calls, unanimous_alleles, self.ingroup_sample_names,
@@ -188,13 +190,13 @@ class MakeDB():
         #  Remove clades without enough csSNPs
         # =========================================================================
         
-        is_cs_clade = np.count_nonzero(candidate_css,0) > self.min_cssnps
+        is_cs_clade = np.count_nonzero(candidate_css,0) > self.min_snps
         
         cssnps_arr = candidate_css[:,is_cs_clade]
         clade_names = candidate_clade_names[is_cs_clade]
         
         if np.sum(~is_cs_clade) > 0:
-            print(f"The following clades had fewer than {self.min_cssnps} specific SNPs and will be removed:")
+            print(f"The following clades had fewer than {self.min_snps} specific SNPs and will be removed:")
             for cname in candidate_clade_names[~is_cs_clade]:
                 print(f"{cname}\n")
        
@@ -412,7 +414,7 @@ class MakeDB():
         return np.array(rename)    
 
         
-def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, min_presence_core):
+def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, max_frac_ambiguous):
     '''For a list of clades defined by their daughter genomes, return all alleles
     along genomes that are unanimous to members of an individual clade. Clades can
     be ancestors/children of each other.
@@ -450,7 +452,7 @@ def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, mi
         clade_calls = calls[:,clade_idx] 
 
         # Mask samples with too many ambiguous allele calls
-        mask_fracNs = ( ((clade_calls>0).sum(axis=0)/len(clade_calls)) >= min_presence_core )
+        mask_fracNs = ( ((clade_calls>0).sum(axis=0)/len(clade_calls)) >= max_frac_ambiguous )
         if np.sum(mask_fracNs) < 2:
             raise Warning(f"After filtering, Clade {cname} does not have enough genomes to call unanimous alleles!")
         

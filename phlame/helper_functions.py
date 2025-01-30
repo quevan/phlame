@@ -158,10 +158,10 @@ class CandidateMutationTable():
         self.pos = CMT['p']
         self.quals=CMT['quals']
         self.indel_counter=CMT['indel_counter']
-        
-        if len(self.indel_counter) == 1:
-            self.indel_counter = np.zeros((2,len(self.pos),
-                                           len(self.sample_names)))
+
+        # FIX THIS!!!
+        self.indel_counter = np.zeros((2,len(self.pos),
+                                        len(self.sample_names)))
             
         # Note that 1 -> yes outgroup, 0 -> not outgroup
         # Makes booleans more confusing I know
