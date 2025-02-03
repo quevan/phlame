@@ -16,60 +16,15 @@ import gzip
 import warnings
 from scipy import stats
 from scipy.optimize import minimize 
-import subprocess
 from statsmodels.base.model import GenericLikelihoodModel
-from scipy.special import digamma, gammaln, loggamma, polygamma
-import zeus
+from scipy.special import digamma, loggamma
+
+import phlame.helper_functions as helper
+
 #%%
 
 # Limit for exponentials to avoid overflow
 EXP_UPPER_LIMIT = np.log(np.finfo(np.float64).max) - 1.0
-
-    
-class Frequencies():
-    '''
-    Holds clade frequency information from a given sample.
-    '''
-    
-    def __init__(self, path_to_frequencies_file):
-        
-        self.freqs = pd.read_csv(path_to_frequencies_file,
-                                       index_col=0)
-                
-class FrequenciesData():
-    '''
-    Holds csSNP counts and modeling information from a given sample.
-    '''
-
-    def __init__(self, path_to_data_file):
-        
-        with gzip.open(path_to_data_file, 'rb') as f:
-            
-            data_dct, fit_info_dct = pickle.load(f)
-            
-            # clade_counts structured as follows
-            
-            self.clade_counts = data_dct['clade_counts']
-            self.clade_counts_pos = data_dct['clade_counts_pos']
-            
-            self.counts_MLE = fit_info_dct['counts_MLE']
-            self.total_MLE = fit_info_dct['total_MLE']
-            self.counts_MAP = fit_info_dct['counts_MAP']
-            self.chain = fit_info_dct['chain']
-            self.prob = fit_info_dct['prob']
-
-
-class CountsMat():
-    '''
-    Hold data and methods for a counts matrix
-    '''
-    def __init__(self, path_to_cts_file):
-        
-        with gzip.open(path_to_cts_file,'rb') as f:
-            counts, pos = pickle.load(f)
-                
-        self.counts = counts
-        self.pos = pos
         
 class Classify:
     '''
@@ -84,9 +39,9 @@ class Classify:
     they appear in the PhLAMe classifier OR custom group genomes 
     into clades in a 2 column .tsv {genomeID, cladeID}.\n
     
-    path_to_output_frequencies (str): Path to output frequencies file.\n
+    path_to_frequencies (str): Path to output frequencies file.\n
     
-    path_to_output_data (str, optional): If True, outputs a data file 
+    path_to_data (str, optional): If True, outputs a data file 
     with counts and modeling information at the defined level.
     Defaults to False.\n
     
@@ -99,19 +54,25 @@ class Classify:
     
     '''
     
-    def __init__(self, path_to_cts_file, path_to_classifier,
-                 path_to_output_frequencies,
+    def __init__(self,
+                 path_to_pileup,
+                 path_to_classifier,
+                 ref_file,
+                 path_to_frequencies,
+                 path_to_cts_file=None,
                  level_input=False,
-                 path_to_output_data=False,
-                 mode='Bayesian',
+                 path_to_data=False,
+                 mode='mle',
                  min_snps=10, max_pi=0.3, min_prob=0.5, min_hpd=0.1,
-                 nchain=10000, perc_burn=0.1, seed=False):
+                 nchain=10000, perc_burn=0.1, seed=False, verbose=True):
 
-        self.__input_cts_file = path_to_cts_file
+        self.__path_to_pileup = path_to_pileup
+        self.__path_to_counts_file = path_to_cts_file
+        self.__ref_file = ref_file
         self.__classifier_file = path_to_classifier
         self.__levels_input = level_input
-        self.__output_freqs_file = path_to_output_frequencies
-        self.__output_data_file = path_to_output_data
+        self.__output_freqs_file = path_to_frequencies
+        self.__output_data_file = path_to_data
 
         self.max_pi = max_pi
         self.min_snps = min_snps
@@ -123,7 +84,7 @@ class Classify:
         self.seed = seed
 
         self.mode = mode
-                
+
     def main(self):
         
         # =====================================================================
@@ -131,20 +92,8 @@ class Classify:
         # =====================================================================
         print("Reading in file(s)...")
         
-        self.countsmat = CountsMat(self.__input_cts_file)
+        self.load_data()
         
-        self.classifier = PhlameClassifier.read_file(self.__classifier_file)
-        
-        if self.__levels_input:
-            self.mylevel = PhyloLevel(self.__levels_input, 
-                                      self.classifier.clades, 
-                                      self.classifier.clade_names)
-            
-            # Grab just information for the specific level
-            self.level_cfr = self.classifier.grab_level(self.mylevel)
-        
-        else:
-            self.level_cfr = self.classifier
         # =====================================================================
         #  Sort through counts mat to grab just the relevant positions
         # =====================================================================
@@ -164,6 +113,27 @@ class Classify:
         self.calc_frequencies()
             
         self.save_frequencies()
+
+
+    def load_data(self):
+        
+        self.countsmat = helper.CountsMat(self.__path_to_pileup,
+                                          self.__ref_file,
+                                          self.__classifier_file)
+        self.countsmat.main()
+
+        self.classifier = helper.PhlameClassifier.read_file(self.__classifier_file)
+        
+        if self.__levels_input:
+            self.mylevel = PhyloLevel(self.__levels_input, 
+                                      self.classifier.clades, 
+                                      self.classifier.clade_names)
+            
+            # Grab just information for the specific level
+            self.level_cfr = self.classifier.grab_level(self.mylevel)
+        
+        else:
+            self.level_cfr = self.classifier
 
     def index_counts(self):
         '''
@@ -240,8 +210,8 @@ class Classify:
         save_cts_map = []
 
         save_prob=np.full(nclades,-1,dtype=np.float64)
-        save_cts_mle=np.full((nclades,2),-1,dtype=np.float64)
-        save_total_mle=np.full((nclades,2),-1,dtype=np.float64)
+        save_counts_MLE=np.full((nclades,2),-1,dtype=np.float64)
+        save_total_MLE=np.full((nclades,2),-1,dtype=np.float64)
 
         save_flag_highalpha = np.full(nclades,False,dtype=bool)
         save_flag_map_mle_diff = np.full(nclades,False,dtype=bool)
@@ -257,7 +227,6 @@ class Classify:
             cts2model = byclade_cts[0] + byclade_cts[1]
             total2model = byclade_cts[2] + byclade_cts[3]
 
-
             # To model, a clade must have a nonzero_zero ratio > 0.03 
             # and at least 10 SNPs with nonzero counts
             if (np.count_nonzero(cts2model) >= self.min_snps):
@@ -271,51 +240,43 @@ class Classify:
                                 
                 print(f"Fit results for clade: {clade_names[c]}")
                 
-                cts_fit = countsCSS_NEW(cts2model,
-                                        total2model,
-                                        seed=self.seed,
-                                        mode=self.mode)
+                fit = countsCSS_NEW(cts2model,
+                                    total2model,
+                                    seed=self.seed,
+                                    mode=self.mode)
                                                     
-                prob, hpd = cts_fit.fit(max_pi = self.max_pi,
-                                        nchain = self.nchain,
-                                        nburn = int(self.perc_burn*self.nchain))
+                frequency, prob = fit.fit(max_pi = self.max_pi,
+                                          nchain = self.nchain,
+                                          nburn = int(self.perc_burn*self.nchain))
 
-                print(f"MLE fit: cts lambda={cts_fit.counts_mle[0]:.2f} cts pi={cts_fit.counts_mle[1]:.2f}")
-                print(f"total lambda={cts_fit.total_mle[0]:.2f} total pi={cts_fit.total_mle[1]:.2f}")
-
-                print(f"HPD interval: {hpd[0]:.2f}-{hpd[1]:.2f}")
+                # print(f"MLE fit: cts lambda={fit.counts_MLE[0]:.2f} cts pi={fit.counts_MLE[1]:.2f}")
+                # print(f"total lambda={fit.total_MLE[0]:.2f} total pi={fit.total_MLE[1]:.2f}")
+                # print(f"HPD interval: {fit.hpd[0]:.2f}-{fit.hpd[1]:.2f}")
                 
                 # Only count clades if pass probability and HPD thresholds
-                if (prob > self.min_prob) & (hpd[0] <= self.min_hpd) & (ratio_nonzero_zero > 0.03):
+                if (prob > self.min_prob) & \
+                    (fit.hpd[0] <= self.min_hpd) & \
+                        (ratio_nonzero_zero > 0.03):
 
-                    frequencies[c] = ((cts_fit.counts_MAP['a']/cts_fit.counts_MAP['b'])/
-                                      cts_fit.total_mle[0])
+                    frequencies[c] = fit.frequency
                     
-                    # Flag results with issues
-                    if abs(frequencies[c] - cts_fit.counts_mle[0]/cts_fit.total_mle[0]) > 0.2:
-                        save_flag_map_mle_diff[c] = True
-
-                # if nonzero_zero ratio is > 0.1, accept call
-                # elif (ratio_nonzero_zero > 0.1):
-                #     frequencies[c] = ((cts_fit.counts_MAP['a']/cts_fit.counts_MAP['b'])/
-                #                       cts_fit.total_mle[0])
-
-                if cts_fit.measured_alpha > 100000:
+                if fit.measured_alpha > 100000:
                     save_flag_highalpha[c] = True
 
                 # Save fit information
-                save_chain.append(cts_fit.chain)
-                save_hpd.append(cts_fit.hpd)
-                save_cts_map.append(cts_fit.counts_MAP)
-                save_cts_mle[c] = cts_fit.counts_mle
-                save_total_mle[c] = cts_fit.total_mle
+                save_hpd.append(fit.hpd)
+                save_cts_map.append(fit.counts_MAP)
+                save_counts_MLE[c] = fit.counts_MLE
+                save_total_MLE[c] = fit.total_MLE
                 save_prob[c] = prob
+                
+                # save_chain.append(fit.chain)
 
             # Otherwise is zero
             else:
                 print(f"Clade: {clade_names[c]} ",
                       "does not have not enough SNPs to model")
-                save_chain.append({})
+                # save_chain.append({})
                 save_hpd.append(np.array((-1,-1)))
                 save_cts_map.append({})
 
@@ -331,14 +292,12 @@ class Classify:
         self.frequencies = frequencies_df
         self.data = {'clade_counts':save_cts,
                      'clade_counts_pos':save_cts_pos}
-        self.fit_info = {'counts_MLE': save_cts_mle,
-                         'total_MLE':save_total_mle,
+        self.fit_info = {'counts_MLE': save_counts_MLE,
+                         'total_MLE':save_total_MLE,
                          'counts_MAP':save_cts_map,
-                         'chain':save_chain,
+                         'chain':[],
                          'prob':save_prob,
-                         'hpd':save_hpd,
-                         'flag_highalpha':save_flag_highalpha,
-                         'flag_map_mle_diff':save_flag_map_mle_diff}
+                         'hpd':save_hpd}
     
     def save_frequencies(self):
         '''
@@ -372,64 +331,6 @@ class Classify:
                       clade_tot_f,
                       clade_tot_r])
 
-        
-class PhlameClassifier():
-    '''
-    Holds data and methods for a single Phlame Classifier object
-    '''
-    def __init__(self,
-                 csSNPs, csSNP_pos,
-                 clades, clade_names):
-
-        self.csSNPs = csSNPs
-        self.csSNP_pos = csSNP_pos
-        self.clades = clades
-        self.clade_names = clade_names
-        
-        # Get allele information
-        self.get_alleles()
-    
-    def read_file(path_to_classifier_file):
-
-        with gzip.open(path_to_classifier_file, 'rb') as f:
-            cssnp_dct = pickle.load(f)
-            
-            csSNPs = cssnp_dct['cssnps']
-            csSNP_pos = cssnp_dct['cssnp_pos']
-            clades = cssnp_dct['clades']
-            clade_names = cssnp_dct['clade_names']
-            
-        return PhlameClassifier(csSNPs, csSNP_pos, clades, clade_names)
-
-    def grab_level(self, PhyloLevel):
-        '''
-        Grab just information for a specific level.
-        '''
-        
-        idx=[]
-        
-        for clade in PhyloLevel.clade_names:
-            
-            idx.append(np.where(self.clade_names==clade)[0][0])
-        
-        level_csSNPs = self.csSNPs[:,idx]
-
-        level_csSNP_pos = self.csSNP_pos[~np.all(level_csSNPs == 0, axis=1)]
-        
-        return PhlameClassifier(level_csSNPs[~np.all(level_csSNPs == 0, axis=1)],
-                                level_csSNP_pos,
-                                PhyloLevel.clades,
-                                PhyloLevel.names)
-    
-    def get_alleles(self):
-        '''
-        Get 1D list of every allele and corresponding clade.
-        '''
-        self.alleles = self.csSNPs[np.nonzero(self.csSNPs)]
-        # corresponding clade index
-        self.allele_cidx = np.nonzero(self.csSNPs)[1]
-
-
 class countsCSS_NEW:
     '''
     Hold and model counts data covering a single set of cluster-specific SNPs.
@@ -438,16 +339,17 @@ class countsCSS_NEW:
     def __init__(self, 
                  counts, total_counts,
                  force_alpha=False,
+                 prior=True,
                  prior_strength=20,
                  seed=False,
-                 mode='Bayesian'):
+                 mode='bayesian'):
         
         self.counts = counts
         self.total_counts = total_counts
                 
         # Maximum Likelihood fit
-        self.counts_mle = self.zip_fit_mle(self.counts)
-        self.total_mle = self.zip_fit_mle(self.total_counts)
+        self.counts_MLE = self.zip_fit_mle(self.counts)
+        self.total_MLE = self.zip_fit_mle(self.total_counts)
         
         self.force_alpha = force_alpha
 
@@ -456,24 +358,10 @@ class countsCSS_NEW:
         self.seed = seed
 
         self.mode = mode
-        
-    def fit(self, max_pi,
-            nchain=10000, 
-            nburn=500,
-            interval_size=0.95):
-        '''
-        Fit counts data to model using JAGS.
-        '''
-        
-        if self.seed:
-            np.random.seed(self.seed)
-        
-        # =====================================================================
-        #  Set hyperparameters
-        # =====================================================================
-        
-        if self.force_alpha:
-            self.measured_alpha = self.force_alpha
+
+        # Set hyperparameters
+        if force_alpha:
+            self.measured_alpha = force_alpha
             
         else:
             self.measured_alpha = np.mean(self.total_counts)**2/max(1e-6,np.var(self.total_counts)-np.mean(self.total_counts))
@@ -482,26 +370,53 @@ class countsCSS_NEW:
         logp = m * digamma(self.measured_alpha)
         v = 0; s = 0
         self.params = [m, logp, v, s]
+
+        if not prior:
+            self.params = [0, np.log(1), 0, 0]
+
+    def fit(self, max_pi,
+            nchain=10000, 
+            nburn=500,
+            interval_size=0.95,
+            subsample=True
+            ):
+        '''
+        Fit counts data to model.
+        '''
+        
+        if self.seed:
+            np.random.seed(self.seed)
         
         # =====================================================================
         #  Maximum Likelihood
         # =====================================================================
-        if self.mode == 'MLE':
+        if self.mode == 'mle':
         
             lambda_MLE, pi_MLE = self.ZINB_MLE()
 
-            self.counts_MLE = {'pi':pi_MLE,
-                            'lambda':lambda_MLE}
+            self.counts_MLE = (pi_MLE,lambda_MLE)
             
             self.hpd = np.array([-1,-1])
 
-            prob = int(pi_MLE < max_pi)  
+            self.counts_MAP = {}
+
+            self.prob = int(pi_MLE < max_pi)
+
+            self.frequency = (lambda_MLE/self.total_MLE[0])
+
 
         # =====================================================================
         #  Gibbs sampling
         # =====================================================================
-        elif self.mode == 'Bayesian':
+        elif self.mode == 'bayesian':
 
+            lambda_MLE, pi_MLE = self.ZINB_MLE()
+
+            self.counts_MLE = (pi_MLE,lambda_MLE)
+
+            if subsample & (len(self.counts) > 1000):
+                self.counts, self.total_counts = self.subsample_positions(1000)
+                
             try:
                 param_chains, lv_chains = self.ZINB_gibbs_sampler(nchain,
                                                                 nburn)
@@ -511,11 +426,13 @@ class countsCSS_NEW:
                 print('Loglikelihood became too low and triggered an overflow error.\
                     Randomly subsampling positions and trying again...')
                 
-                subsample_idx = np.random.choice(np.arange(0,len(self.counts)),
-                                                int(len(self.counts)/2))
+                # subsample_idx = np.random.choice(np.arange(0,len(self.counts)),
+                #                                 int(len(self.counts)/2))
                 
-                self.counts = self.counts[subsample_idx]
-                self.total_counts = self.total_counts[subsample_idx]
+                # self.counts = self.counts[subsample_idx]
+                # self.total_counts = self.total_counts[subsample_idx]
+
+                self.counts, self.total_counts = self.subsample_positions(int(len(self.counts)/2))
                 
                 param_chains, lv_chains = self.ZINB_gibbs_sampler(nchain,
                                                                 nburn)
@@ -525,16 +442,19 @@ class countsCSS_NEW:
                         'a':param_chains[:,1],
                         'b':param_chains[:,2]}
 
-            prob = np.sum(self.chain['pi'] < max_pi)/len(self.chain['pi'])
-
             self.counts_MAP = {'pi':self.calc_MAP(self.chain['pi']),
                             'a':self.calc_MAP(self.chain['a']),
                             'b':self.calc_MAP(self.chain['b'])}
             
             self.hpd = self.get_hpd(self.chain['pi'], interval_size)
-            self.prob = prob
+            self.prob = np.sum(self.chain['pi'] < max_pi)/len(self.chain['pi'])
+
+            self.frequency = ((self.counts_MAP['a']/self.counts_MAP['b'])/self.total_MLE[0])
+
+        else:
+            raise ValueError('Mode must be either "mle" or "bayesian"')
             
-        return prob, self.hpd
+        return self.frequency, self.prob
 
     def ZINB_MLE(self):
         
@@ -622,7 +542,15 @@ class countsCSS_NEW:
         
         return param_inits, latent_var_inits
 
-    
+    def subsample_positions(self, n):
+        '''
+        Subsample n positions from the counts data.
+        '''
+        
+        idx = np.random.choice(np.arange(0,len(self.counts)), n)
+        
+        return self.counts[idx], self.total_counts[idx]
+        
     def zip_fit_mle(self, cts):
         
         with warnings.catch_warnings():
