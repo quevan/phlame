@@ -17,22 +17,6 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 
 import phlame.helper_functions as helper
-import phlame.classify_module as classify
-
-#%% Plooting
-# path_to_frequencies_file=f'{path_to_frequencies_dir}/{sample}_ref_{refgenome}_frequencies.csv'
-# path_to_data_file=f'{path_to_frequencies_dir}/{sample}_ref_{refgenome}_fitinfo.data'
-
-# fig = plot_sample(sample, 
-#                   path_to_frequencies_file,
-#                   path_to_data_file,
-#                   max_pi = 0.35,
-#                   min_prob = 0.5)
-
-# fig.tight_layout()
-# #
-# fig.savefig(f"/Users/evanqu/Desktop/{sample}.pdf", format='pdf')
-
 
 #%%
 
