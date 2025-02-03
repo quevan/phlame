@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from Bio import AlignIO
 from Bio import SeqIO
-
+import glob
 
 class Frequencies():
     '''
@@ -48,17 +48,248 @@ class FrequenciesData():
             self.prob = fit_info_dct['prob']
 
 
+# class CountsMat():
+#     '''
+#     Holds data and methods for a counts matrix.
+#     '''
+#     def __init__(self, path_to_cts_file):
+        
+#         with gzip.open(path_to_cts_file,'rb') as f:
+#             counts, pos = pickle.load(f)
+                
+#         self.counts = counts
+#         self.pos = pos
+
+
 class CountsMat():
     '''
     Holds data and methods for a counts matrix.
     '''
-    def __init__(self, path_to_cts_file):
+
+    def __init__(self, 
+                 path_to_pileup, 
+                 path_to_ref, 
+                 path_to_classifiers):
+        
+        self.path_to_pileup = path_to_pileup
+        self.path_to_ref = path_to_ref
+        self.path_to_classifiers = path_to_classifiers
+
+        self.chr_starts, self.genome_length, self.scaf_names = genomestats(self.path_to_ref)
+
+    def readin(self,
+               path_to_cts_file):
+        '''
+        Read in an existing counts object.
+        '''
         
         with gzip.open(path_to_cts_file,'rb') as f:
             counts, pos = pickle.load(f)
                 
         self.counts = counts
         self.pos = pos
+
+    def main(self):
+        
+        print(f"Reading input file: {self.path_to_pileup}")
+        counts, pos = self.pileup2counts(self.path_to_pileup,
+                                         self.path_to_classifiers)
+        
+        self.counts = counts
+        self.pos = pos
+
+    def pileup2counts(self,
+                      input_pileup,
+                      path_to_classifiers):
+        '''Grabs relevant allele info from mpileupfile and stores as a nice array.
+
+        Args:
+            input_pileup (str): Path to input pileup file.
+            path_to_ref (str): Path to reference genome file.
+            path_to_classifiers (str): Path to classifier file(s).
+            
+        '''
+        # Initial parameters
+        nts = 'ATCGatcg'
+        num_fields = 8
+        
+        # Get classifier position information
+        allpos = self.classifier_stats(path_to_classifiers)
+        
+        data = np.zeros((len(allpos),num_fields)) #format [[A T C G  a t c g],[...]]
+        
+        ##### read in mpileup file #####
+        mpileup = open(input_pileup)
+
+        loading_bar = 0
+        for line in mpileup:
+            
+            # loading_bar+=1
+            # if loading_bar % 500 == 0:
+            #     print('.')
+
+            lineinfo = line.strip().split('\t')
+            
+            #holds info for each line before storing in data
+            temp = np.zeros((num_fields))
+            
+            chromo = lineinfo[0]
+            
+            #position (absolute)
+            if chromo not in self.scaf_names:
+                raise ValueError("Contig name in pileup file not found in reference!")
+
+            if len(self.chr_starts) == 1:
+                position=int(lineinfo[1])
+            else:
+                position=int(self.chr_starts[np.where(chromo==self.scaf_names)]) + int(lineinfo[1])
+                #chr_starts begins at 0
+            pidx = np.searchsorted(allpos, position) # index of position on allpos
+            
+            #ref allele
+            ref=int(np.char.find(nts,lineinfo[2])) # convert to 0123
+            if ref > 4:
+                ref = ref - 4
+            
+            #calls info
+            #calls=lineinfo[4]
+            calls=np.array([ord(l) for l in lineinfo[4]]) #ASCII
+            
+            #find starts of reads ('^' in mpileup)
+            startsk=np.where(calls==94)[0]
+            for k in startsk:
+                calls[k:k+2]=-1 #WHAT IS -1
+                #remove mapping character, absolutely required because the next chracter could be $
+            
+            #find ends of reads ('$' in mpileup)
+            endsk=np.where(calls==36)[0]
+            calls[endsk]=-1
+            
+            #find indels + calls from reads supporting indels ('+-')
+            indelk = np.where((calls==43) | (calls==45))[0]
+            for k in indelk:
+                if (calls[k+2] >=48) and (calls[k+2] < 58): #2 digit indel (size > 9 and < 100)
+                    indelsize=int(chr(calls[k+1]) + chr(calls[k+2])) 
+                    #indelsize=str2double(char(calls(k+1:k+2))); MATLAB
+                    indeld=2
+                else: #1 digit indel (size <= 9)
+                    indelsize=int(chr(calls[k+1]))
+                    indeld=1
+            #remove indel info from counting
+                calls[k:(k+1+indeld+indelsize)] = -1 #don't remove base that precedes an indel
+            
+            #replace reference matches (.,) with their actual calls
+            if ref >=0:
+                calls[np.where(calls==46)[0]]=ord(nts[ref]) #'.'
+                calls[np.where(calls==44)[0]]=ord(nts[ref+4]) #','
+            # if ref >=0:
+            #     calls[np.where(calls==46)[0]]=ord(nts[int(np.char.find(nts,ref))]) # changed from nts(ref); matlab
+            #     calls[np.where(calls==44)[0]]=ord(nts[int(np.char.find(nts,ref))+4]) # changed from=nts(ref+4); matlab
+
+            #index reads for finding scores
+            simplecalls=calls[np.where(calls>0)[0]]
+            #simplecalls is a tform of calls where each calls position
+            #corresponds to its position in bq, mq, td
+            
+            #count how many of each nt and average scores
+            for nt in range(8):
+                nt_count=np.count_nonzero(simplecalls == ord(nts[nt]))
+                if nt_count > 0:
+                    temp[nt]=nt_count
+            # for nt in range(8):
+            #     if not sum(simplecalls == ord(nts[nt])) == 0:
+            #         temp[nt]=sum(simplecalls == ord(nts[nt]))
+
+            # Store in big array
+            data[pidx]=temp
+        
+        return data, allpos
+
+    @staticmethod
+    def read_fasta(path_to_refgenome): 
+        '''Reads in fasta file. If directory is given, reads in dir/genome.fasta
+        Args:
+            path_to_refgenome (str): Path to reference genome.
+
+        Returns: SeqIO object for reference genome.
+        '''
+        fasta_file = glob.glob(path_to_refgenome + '/genome.fasta')
+        if len(fasta_file) != 1:
+            fasta_file_gz = glob.glob(path_to_refgenome + '/genome.fasta.gz')
+            if len(fasta_file_gz) != 1:
+                raise ValueError('Either no genome.fasta(.gz) or more than 1 genome.fasta(.gz) file found in ' + path_to_refgenome)
+            else: # genome.fasta.gz
+                refgenome = SeqIO.parse(gzip.open(fasta_file_gz[0], "rt"),'fasta')
+        else: # genome.fasta
+            refgenome = SeqIO.parse(fasta_file[0],'fasta')
+        
+        return refgenome
+    
+    @staticmethod
+    def classifier_stats(path_to_classifiers):
+        '''Parse classifier file(s) to extract position information
+
+        Args:
+            path_to_classifiers (str): Comma separated string of paths to classifiers.
+
+        Returns:
+            allpos (arr): Array of absolute positions referenced in classifier(s).
+
+        '''
+        
+        cat_pos = np.array([], dtype=np.int32)
+    
+        path_to_cfrs_ls = []
+        # Parse whether file or directory of files
+        if os.path.isdir(path_to_classifiers):
+            
+            for filename in os.listdir(path_to_classifiers):
+                
+                if filename.endswith('.classifier'):
+                    path_to_cfrs_ls.append(path_to_classifiers+'/'+filename)
+        else:
+            path_to_cfrs_ls.append(path_to_classifiers)
+
+        for cfr in path_to_cfrs_ls:
+            
+            with gzip.open(cfr,'rb') as f:
+                csSNPs = pickle.load(f)
+                                
+                pos = csSNPs['cssnp_pos']
+                cat_pos = np.concatenate([pos,cat_pos])
+
+        allpos = np.unique(np.sort(cat_pos))
+    
+        return allpos
+
+    @staticmethod        
+    def chrpos_stats(self, path_to_pos_file):
+        
+        self.genome_length = 0
+        self.scaf_names_ls = []
+        chr_pos = []
+
+        with open(path_to_pos_file,'r') as file:
+            
+            for line in file:
+                
+                position = line.strip().split('\t')
+                self.scaf_names_ls.append(position[0])
+                chr_pos.append(position[1])
+        
+        self.scaf_names, lengths = np.unique(self.scaf_names_ls,return_counts=True)
+        self.chr_starts=[]
+
+        if len(self.scaf_names) == 1:
+            self.chr_starts.append(self.genome_length)
+            self.genome_length = lengths[0]
+        else:
+            for scaf, len_ in zip(self.scaf_names,lengths):
+                self.chr_starts.append(self.genome_length)            
+                self.genome_length = self.genome_length + len_
+        
+        return self.chr_starts, self.genome_length, self.scaf_names
+
 
 class PhlameClassifier():
     '''
@@ -395,3 +626,95 @@ def write_calls_to_fasta(calls,sample_names,output_file):
         fa_file.write(">" + name + "\n" + nucl_string + "\n")
     
     fa_file.close()    
+
+def read_fasta(reference_genome_file): 
+    '''Reads in fasta file. If directory is given, reads in dir/genome.fasta
+    Args:
+        reference_genome_file (str): Path to reference genome.
+
+    Returns: SeqIO object for reference genome.
+    '''
+
+    if os.path.exists(reference_genome_file):
+        refgenome = SeqIO.parse(reference_genome_file,'fasta')
+
+        return refgenome
+
+    fasta_file = glob.glob(reference_genome_file + '/genome.fasta')
+    if len(fasta_file) != 1:
+        fasta_file_gz = glob.glob(reference_genome_file + '/genome.fasta.gz')
+        if len(fasta_file_gz) != 1:
+            raise ValueError('Either no genome.fasta(.gz) or more than 1 genome.fasta(.gz) file found in ' + reference_genome_file)
+        else: # genome.fasta.gz
+            refgenome = SeqIO.parse(gzip.open(fasta_file_gz[0], "rt"),'fasta')
+    else: # genome.fasta
+        refgenome = SeqIO.parse(fasta_file[0],'fasta')
+    
+    return refgenome
+
+def genomestats(path_to_refgenome):
+    '''Parse genome to extract relevant stats
+
+    Args:
+        REFGENOMEFOLDER (str): Path to reference genome.
+
+    Returns:
+        ChrStarts (arr): DESCRIPTION.
+        Genomelength (arr): DESCRIPTION.
+        ScafNames (arr): DESCRIPTION.
+
+    '''
+
+    refgenome = read_fasta(path_to_refgenome)
+    
+    Genomelength = 0
+    ChrStarts = []
+    ScafNames = []
+    for record in refgenome:
+        ChrStarts.append(Genomelength) # chr1 starts at 0 in analysis.m
+        Genomelength = Genomelength + len(record)
+        ScafNames.append(record.id)
+    # close file
+    #refgenome.close() # biopy update SeqIO has no close attribute anymore.
+    # turn to np.arrys!
+    ChrStarts = np.asarray(ChrStarts,dtype=int)
+    Genomelength = np.asarray(Genomelength,dtype=int)
+    ScafNames = np.asarray(ScafNames,dtype=object)
+    
+    return ChrStarts,Genomelength,ScafNames
+
+def p2chrpos(p, ChrStarts):
+    '''Convert 1col list of pos to 2col array with chromosome and pos on chromosome
+
+    Args:
+        p (TYPE): DESCRIPTION.
+        ChrStarts (TYPE): DESCRIPTION.
+
+    Returns:
+        chrpos (TYPE): DESCRIPTION.
+
+    '''
+        
+    # get chr and pos-on-chr
+    chromo = np.ones(len(p),dtype=int)
+    if len(ChrStarts) > 1:
+        for i in ChrStarts[1:]:
+            chromo = chromo + (p > i) # when (p > i) evaluates 'true' lead to plus 1 in summation. > bcs ChrStarts start with 0...genomestats()
+        positions = p - ChrStarts[chromo-1] # [chr-1] -1 due to 0based index
+        chrpos = np.column_stack((chromo,positions))
+    else:
+        chrpos = np.column_stack((chromo,p))
+    return chrpos
+
+def parse_file_list(path_to_file):
+    with open(path_to_file, 'r') as f:
+        file_list = f.read().splitlines()
+
+    for file_ in file_list:
+        if not os.path.isabs(file_):
+            abs_path = os.path.abspath(file_)
+            if not os.path.exists(abs_path):
+                raise FileNotFoundError(f"File not found: {abs_path}")
+            file_list[file_list.index(file_)] = os.path.abspath(file_)
+
+    return file_list

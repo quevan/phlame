@@ -55,16 +55,20 @@ class Classify:
     '''
     
     def __init__(self,
-                 path_to_cts_file,
+                 path_to_pileup,
                  path_to_classifier,
+                 ref_file,
                  path_to_frequencies,
+                 path_to_cts_file=None,
                  level_input=False,
                  path_to_data=False,
                  mode='mle',
                  min_snps=10, max_pi=0.3, min_prob=0.5, min_hpd=0.1,
                  nchain=10000, perc_burn=0.1, seed=False, verbose=True):
 
+        self.__path_to_pileup = path_to_pileup
         self.__path_to_counts_file = path_to_cts_file
+        self.__ref_file = ref_file
         self.__classifier_file = path_to_classifier
         self.__levels_input = level_input
         self.__output_freqs_file = path_to_frequencies
@@ -113,8 +117,11 @@ class Classify:
 
     def load_data(self):
         
-        self.countsmat = helper.CountsMat(self.__path_to_counts_file)
-        
+        self.countsmat = helper.CountsMat(self.__path_to_pileup,
+                                          self.__ref_file,
+                                          self.__classifier_file)
+        self.countsmat.main()
+
         self.classifier = helper.PhlameClassifier.read_file(self.__classifier_file)
         
         if self.__levels_input:

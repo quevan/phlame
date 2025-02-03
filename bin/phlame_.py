@@ -16,6 +16,7 @@ import phlame.classify_module as classify
 import phlame.tree_module as tree
 import phlame.make_classifier_module as makedb
 import phlame.plot_module as plot
+import phlame.countsCMT as CMT
 
 #%%
 
@@ -37,7 +38,8 @@ Main operations:
 
 Auxiliary operations:
     plot -> Generate informative plots from classify output.
-    cmt -> Convert aligned pileup files into a candidate mutation table.
+    cmt -> Convert counts files into a candidate mutation table.
+    counts -> Convert aligned pileup files into compressed counts matrix format.
             ''')
 
 if __name__ == '__main__':
@@ -60,14 +62,17 @@ if __name__ == '__main__':
     makedb_op = subparsers.add_parser('makedb', help='Create a PHLAME database.')
     tree_op = subparsers.add_parser('tree', help='Create a phylogenetic tree or .phylip file.')
     plot_op = subparsers.add_parser('plot', help='Generate informative plots from classify output.')
-    cmt_op = subparsers.add_parser('cmt', help='Convert aligned pileup files into a candidate mutation table.')
+    cmt_op = subparsers.add_parser('cmt', help='Convert counts files into a candidate mutation table.')
+    counts_op = subparsers.add_parser('counts', help='Convert aligned pileup files into a compressed counts file.')
 
 
     # Classify arguments
     classify_op.add_argument('-i', dest='input', type=str, required=True, 
-                          help='Path to input counts file.')
+                          help='Path to input pileup file.')
     classify_op.add_argument('-c', dest='classifier', type=str, required=True,
                           help='Path to classifer file.')
+    classify_op.add_argument('-r', dest='ref', type=str, required=True,
+                            help='Path to reference genome (.fasta).')
     classify_op.add_argument('-l', dest='level', type=str, default=False, required=False,
                           help='Level specification.')
     classify_op.add_argument('-o', dest='output', type=str, required=True,
@@ -182,14 +187,40 @@ if __name__ == '__main__':
                         help='Maximum pi value to count a lineage as present.')
     plot_op.add_argument('--min_prob', type=float, default=0.5, required=False,
                         help='Minimum probability score to count a lineage as present.')
+    
+
+    # CMT arguments
+    cmt_op.add_argument('-i', dest='counts_files', type=str, required=True,
+                        help='Path to file (newline-separated) listing counts files, in same order as sample names.')
+    cmt_op.add_argument('-s', dest='sample_names', type=str, required=True,
+                        help='Path to file (newline-separated) listing sample names.')
+    cmt_op.add_argument('-r', dest='ref', type=str, required=True,
+                        help='Path to reference genome.')
+    cmt_op.add_argument('-o', dest='out_cmt', type=str, required=True,
+                        help='Path to output CMT file.')
+       
+    
+    # Counts arguments
+    counts_op.add_argument('-p', dest='pileup', type=str, required=True,
+                            help='Path to input pileup file.')
+    counts_op.add_argument('-v', dest='vcf', type=str, required=True,
+                            help='Path to input VCF file.')
+    counts_op.add_argument('-w', dest='variant_vcf', type=str, required=True,
+                            help='Path to input variant VCF file.')
+    counts_op.add_argument('-r', dest='ref', type=str, required=True,
+                            help='Path to reference genome.')
+    counts_op.add_argument('-o', dest='output_counts', type=str, required=True,
+                            help='Path to output counts file.')
+    
 
 
     args = parser.parse_args()
     
     if args.operation=='classify':
         
-        results = classify.Classify(path_to_cts_file=args.input,
+        results = classify.Classify(path_to_pileup=args.input,
                                     path_to_classifier=args.classifier,
+                                    ref_file=args.ref,
                                     path_to_frequencies=args.output,
                                     path_to_data=args.outputdata,
                                     level_input=args.level,
@@ -257,15 +288,19 @@ if __name__ == '__main__':
 
     if args.operation=='cmt':
 
-        print("CMT not yet implemented.")
-
+        results = CMT.Case(path_to_sample_names=args.sample_names,
+                           path_to_diversity_files=args.diversity_files,
+                           path_to_ref=args.ref,
+                           path_to_out_cmt=args.out_cmt)
         
-        # print("Pass to classify operation with params:")
-        # print(f"path_to_cts_file={args.input}")
-        # print(f"path_to_classifier={args.classifier}")
-        # print(f"level_input={args.level}")
-        # print(f"path_to_output_frequencies={args.output}")
-        # print(f"path_to_output_data={args.outputdata}")
-        # print(f"max_pi={args.max_pi}")
-        # print(f"min_prob={args.min_prob}")
-        # print(f"min_snps={args.min_snps}")
+        results.main()
+
+    if args.operation=='counts':
+
+        results = CMT.Pileup2Diversity(path_to_pileup=args.pileup,
+                                       path_to_vcf=args.vcf,
+                                       path_to_variant_vcf=args.variant_vcf,
+                                       path_to_ref=args.ref,
+                                       path_to_output_diversity=args.output_diversity)
+        
+        results.main()
