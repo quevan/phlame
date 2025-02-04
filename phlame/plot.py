@@ -14,7 +14,6 @@ import os
 import pickle
 import gzip
 import matplotlib.pyplot as plt
-import scipy.stats as stats
 
 import phlame.helper_functions as helper
 

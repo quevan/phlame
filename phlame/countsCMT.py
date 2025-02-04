@@ -6,9 +6,7 @@
 import numpy as np
 import gzip
 import os
-import glob
 import pickle
-from Bio import SeqIO
 import phlame.helper_functions as helper
 
 #%% combine_positions.py
