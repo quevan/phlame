@@ -12,8 +12,6 @@ The accepted raw inputs to PHLAME are:
 $ pip install phlame
 ```
 
-
-
 ## Dependencies
 * numpy - (tested with v1.20.3)
 * matplotlib - (tested with v3.4.2)
@@ -26,3 +24,4 @@ $ pip install phlame
 ### Optional
 
 * [RaXML](https://cme.h-its.org/exelixis/web/software/raxml/) - (tested with v8.2.13)
+
