@@ -10,20 +10,17 @@ Created on Sun Sep 25 21:57:14 2022
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-import gzip
-import pickle
 import matplotlib.pyplot as plt
 import os
 import shlex
+import shutil
 import subprocess
 from Bio import AlignIO
-from Bio import SeqIO
 
 import warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore")
     import ete3
-
 
 import phlame.helper_functions as helper
 
@@ -310,8 +307,31 @@ class CMT2tree():
 
         if self.output_tree:
 
+            self.check_raxml()
+
             self.make_tree()
     
+    def check_raxml(self):
+        '''
+        Check if raxml is installed.
+        '''
+        # find the location of the program
+        loc = shutil.which('raxmlHPC')
+
+        # make sure the help on the program works
+        if loc == None:
+            raise Exception("Executable raxmlHPC not found. Install RaXML first before creating a tree, or just create a phylip file.")
+
+        works = False
+        if loc != None:
+            try:
+                o = subprocess.check_output([loc, '-h'],stderr=subprocess.STDOUT)
+                works = True
+            except:
+                pass
+
+        if not works:
+            raise Exception("Executable raxmlHPC found, but not working. Make sure RaXML is installed correctly, or just create a phylip file.")
 
     def make_tree(self):
         '''
