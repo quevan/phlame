@@ -93,7 +93,3 @@ C.2.1.1.2,0.0,[0.54419195 0.78240866],0.0
 There are three fields that PHLAME will return: [1] the estimated frequency of the clade in the sample, [2] the estimated Divergence of the sample from the MRCA of that clade, and [2] the overall probability that the sample supports a clade that is within your `--max_pi` threshold.
 
 
-
-
-
-
