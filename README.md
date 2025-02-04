@@ -9,7 +9,7 @@ The accepted raw inputs to PHLAME are:
 
 ## Installation
 ```
-$ pip install drep
+$ pip install phlame
 ```
 
 
