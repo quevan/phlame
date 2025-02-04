@@ -11,7 +11,6 @@ import pickle
 import gzip
 import numpy as np
 import pandas as pd
-from Bio import AlignIO
 from Bio import SeqIO
 import glob
 

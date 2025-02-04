@@ -8,15 +8,10 @@ Module containing functions to build a PHLAME classifier.
 #%%
 import os
 import numpy as np
-import pandas as pd 
 # import h5py
-import math
 import pickle
 import gzip
-import warnings
 import ete3
-import itertools    
-from scipy import stats
 
 import phlame.helper_functions as helper
 
