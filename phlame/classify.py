@@ -14,6 +14,12 @@ import pandas as pd
 import pickle
 import gzip
 import warnings
+import tempfile
+import subprocess
+import shlex 
+import contextlib
+import io
+
 from scipy import stats
 from scipy.optimize import minimize 
 from statsmodels.base.model import GenericLikelihoodModel
@@ -55,18 +61,21 @@ class Classify:
     '''
     
     def __init__(self,
-                 path_to_pileup,
+                 path_to_bam,
                  path_to_classifier,
                  ref_file,
                  path_to_frequencies,
                  path_to_cts_file=None,
+                 path_to_pileup=None,
                  level_input=False,
                  path_to_data=False,
                  mode='mle',
                  min_snps=10, max_pi=0.3, min_prob=0.5, min_hpd=0.1,
                  nchain=10000, perc_burn=0.1, seed=False, verbose=True):
 
+        self.__path_to_bam_file = path_to_bam
         self.__path_to_pileup = path_to_pileup
+
         self.__path_to_counts_file = path_to_cts_file
         self.__ref_file = ref_file
         self.__classifier_file = path_to_classifier
@@ -91,9 +100,11 @@ class Classify:
         #  Load Data
         # =====================================================================
         print("Reading in file(s)...")
-        
+
+        self.load_classifier()
+
         self.load_data()
-        
+    
         # =====================================================================
         #  Sort through counts mat to grab just the relevant positions
         # =====================================================================
@@ -115,13 +126,70 @@ class Classify:
         self.save_frequencies()
 
 
-    def load_data(self):
-        
-        self.countsmat = helper.CountsMat(self.__path_to_pileup,
-                                          self.__ref_file,
-                                          self.__classifier_file)
-        self.countsmat.main()
+    def get_positions(self,
+                      output_chrpos_file):
+        ''' From a classifier object, produce a samtools compatible list of positions
+            that are informative to calling clades
 
+        Args:
+            path_to_classifier (str): Single path to input classifier file, or path 
+                                    to directory with multiple classifier files.\n
+            output_allpos_file (str): Path to file giving positions as they appear in
+                                    the classifier object (NOT samtools compatible).\n 
+            output_chrpos_file (str): Path to samtools compatible list of positions.
+            refgenome_folder (str): DESCRIPTION.
+
+        Raises:
+            Exception: DESCRIPTION.
+
+        Returns:
+            None.
+
+        '''
+        cat_pos = np.array([], dtype=np.int32)
+        chr_starts, _, scaf_names = helper.genomestats(self.__ref_file)
+        
+        path_to_cfrs_ls = []
+        # Parse whether file or directory of files
+        if os.path.isdir(self.__classifier_file):
+            
+            for filename in os.listdir(self.__classifier_file):
+                
+                if filename.endswith('.classifier'):
+                    path_to_cfrs_ls.append(self.__classifier_file+'/'+filename)
+        else:
+            path_to_cfrs_ls.append(self.__classifier_file)
+            
+        
+        # Get data from each classifier
+        for cfr in path_to_cfrs_ls:
+            
+            with gzip.open(cfr,'rb') as f:
+                csSNPs = pickle.load(f)
+                                
+                pos = csSNPs['cssnp_pos']
+                cat_pos = np.concatenate([pos,cat_pos])
+
+        allpos = np.unique(np.sort(cat_pos))
+        
+        print(f"{len(allpos)} informative positions found across {len(path_to_cfrs_ls)} classifier(s)")
+        
+        chr_pos = helper.p2chrpos(allpos, chr_starts)
+        chr_names = np.array([scaf_names[i-1] for i in chr_pos[:,0]])
+        chr_pos_final = np.vstack((chr_names,chr_pos[:,1])).T
+        
+        #save as samtools compatible txt file
+        # np.savetxt(output_allpos_file, allpos, fmt='%i')
+        np.savetxt(output_chrpos_file, chr_pos_final, delimiter='\t', fmt='%s')
+        
+        return
+
+
+    def load_classifier(self):
+        '''
+        Load in classifier and level information
+        '''
+        
         self.classifier = helper.PhlameClassifier.read_file(self.__classifier_file)
         
         if self.__levels_input:
@@ -134,6 +202,32 @@ class Classify:
         
         else:
             self.level_cfr = self.classifier
+
+    def load_data(self):
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+        
+            chrpositions_file = shlex.quote(os.path.join(temp_dir, 'chrpositions.txt'))
+            pileup_file = shlex.quote(os.path.join(temp_dir, 'temp.pileup'))
+            
+            self.get_positions(chrpositions_file)
+            
+            print("Running samtools mpileup at informative positions...")
+            print(f"samtools mpileup -q30 -x -s -O -d3000 "+ \
+                           f"-l {chrpositions_file} "+ \
+                           f"{shlex.quote(self.__ref_file)} "+ \
+                           f"{shlex.quote(self.__path_to_bam_file)} > {pileup_file}")
+            
+            subprocess.run(f"samtools mpileup -q30 -x -s -O -d3000 "+ \
+                           f"-l {chrpositions_file} "+ \
+                           f"-f {shlex.quote(self.__ref_file)} "+ \
+                           f"{shlex.quote(self.__path_to_bam_file)} > {pileup_file}", shell=True)
+            # pileup_file.flush()  # Ensure data is written
+
+            self.countsmat = helper.CountsMat(pileup_file,
+                                            self.__ref_file,
+                                            self.__classifier_file)
+            self.countsmat.main()
 
     def index_counts(self):
         '''
@@ -210,6 +304,7 @@ class Classify:
         save_cts_map = []
 
         save_prob=np.full(nclades,-1,dtype=np.float64)
+        save_pi=np.full(nclades,-1,dtype=np.float64)
         save_counts_MLE=np.full((nclades,2),-1,dtype=np.float64)
         save_total_MLE=np.full((nclades,2),-1,dtype=np.float64)
 
@@ -269,6 +364,8 @@ class Classify:
                 save_counts_MLE[c] = fit.counts_MLE
                 save_total_MLE[c] = fit.total_MLE
                 save_prob[c] = prob
+                save_pi[c] = np.round(fit.pi,4)
+                # print(fit.counts_MAP.keys())
                 
                 # save_chain.append(fit.chain)
 
@@ -285,8 +382,8 @@ class Classify:
             save_cts_pos.append( byclade_cts_pos )
             
         frequencies_df = pd.DataFrame({'Relative abundance':frequencies,
-                                       'Estimated divergence':save_hpd,
-                                       'Confidence score':save_prob},
+                                       'DVb':save_pi,
+                                       'Probability score':save_prob},
                                       index=self.level_cfr.clade_names)
 
         self.frequencies = frequencies_df
@@ -348,8 +445,9 @@ class countsCSS_NEW:
         self.total_counts = total_counts
                 
         # Maximum Likelihood fit
-        self.counts_MLE = self.zip_fit_mle(self.counts)
-        self.total_MLE = self.zip_fit_mle(self.total_counts)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.counts_MLE = self.zip_fit_mle(self.counts)
+            self.total_MLE = self.zip_fit_mle(self.total_counts)
         
         self.force_alpha = force_alpha
 
@@ -404,6 +502,8 @@ class countsCSS_NEW:
 
             self.frequency = (lambda_MLE/self.total_MLE[0])
 
+            self.pi = pi_MLE
+
 
         # =====================================================================
         #  Gibbs sampling
@@ -450,6 +550,8 @@ class countsCSS_NEW:
             self.prob = np.sum(self.chain['pi'] < max_pi)/len(self.chain['pi'])
 
             self.frequency = ((self.counts_MAP['a']/self.counts_MAP['b'])/self.total_MLE[0])
+
+            self.pi = self.calc_MAP(self.chain['pi'])
 
         else:
             raise ValueError('Mode must be either "mle" or "bayesian"')

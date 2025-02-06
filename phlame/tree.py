@@ -188,6 +188,7 @@ class CMT2tree():
                  input_phylip=None,
                  output_phylip=None,
                  output_renaming_file=None,
+                 outgroup_str=None,
                  output_tree=None,
                  refGenome_file=None, 
                  rescale_bool=False,
@@ -233,6 +234,8 @@ class CMT2tree():
         self.refGenome_file = refGenome_file
         self.rescale_bool = rescale_bool
         self.remov_recomb = remov_recomb
+        self.outgroup_str = outgroup_str
+            
 
         if self.remov_recomb:
             print('Warning: Recombination filtering is not currently implemented. Continuing without filtering.')
@@ -272,6 +275,8 @@ class CMT2tree():
             print(f"Valid phylip file found at: {self.input_phylip}.")
             print(f"Building tree with existing file...")
 
+            self.check_raxml()
+            
             self.make_tree()
 
             return
@@ -284,6 +289,8 @@ class CMT2tree():
         # =========================================================================
         # Filtering
         # =========================================================================
+
+        self.parse_outgroup()
 
         self.filter_coverage()
 
@@ -340,7 +347,7 @@ class CMT2tree():
 
         self.raxml()
 
-        print("Tree built. Renaming phylip names...")
+        # print("Tree built. Renaming phylip names...")
         self.rename_phylip()
 
         
@@ -364,6 +371,23 @@ class CMT2tree():
                                       'tree_snp_distances_linreg.pdf'), format='pdf')
 
 
+    def parse_outgroup(self):
+
+        if self.outgroup_str:
+
+            self.outgroup_ls = [item.strip() for item in self.outgroup_str.split(",")]
+            
+            # Check that all outgroup genomes are present in candidate mutation table
+            if not np.array([genome in self.CMT.sample_names for genome in self.outgroup_ls]).all():
+                raise Exception('The following outgroup genomes are not present in the candidate mutation table: ' +
+                                ', '.join([genome for genome in self.outgroup_ls if genome not in self.CMT.sample_names]))
+
+            self.outgroup_bool = np.isin(self.CMT.sample_names, self.outgroup_ls)
+
+        else:
+            self.outgroup_bool = np.array([True]*len(self.CMT.sample_names))
+
+
     def filter_coverage(self):
         '''
         Remove low-coverage and outgroup samples.
@@ -372,8 +396,9 @@ class CMT2tree():
         # fig = plot_coverage_hist(coverage_all, float(filterby_sample['min_cov_to_include']))
         # fig.show()
 
-        if np.any(self.CMT.in_outgroup):
-            print(f"The following samples were excluded as outgroups: {self.CMT.sample_names[self.in_outgroup]}")
+        if np.sum(self.outgroup_bool) != len(self.CMT.sample_names):
+            print("The following samples were removed as outgroup samples:")
+            print( self.CMT.sample_names[~self.outgroup_bool] )
 
         print("Filtering samples by coverage...")
 
@@ -386,7 +411,7 @@ class CMT2tree():
         print( self.CMT.sample_names[np.median(self.CMT.coverage,axis=0) \
                                      < float(self.filterby_sample['min_cov_to_include'])] )
         
-        include_bool = good_cov_bool & ~self.CMT.in_outgroup
+        include_bool = good_cov_bool & self.outgroup_bool
         
         # Rationale is not removing low-cov samples first will mess with other filtering
         self.sample_names = self.CMT.sample_names[include_bool]
