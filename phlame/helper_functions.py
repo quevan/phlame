@@ -90,7 +90,7 @@ class CountsMat():
 
     def main(self):
         
-        print(f"Reading input file: {self.path_to_pileup}")
+        print(f"Reading pileup file: {self.path_to_pileup}")
         counts, pos = self.pileup2counts(self.path_to_pileup,
                                          self.path_to_classifiers)
         

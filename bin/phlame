@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     # Classify arguments
     classify_op.add_argument('-i', dest='input', type=str, required=True, 
-                          help='Path to input pileup file.')
+                          help='Path to input bam file.')
     classify_op.add_argument('-c', dest='classifier', type=str, required=True,
                           help='Path to classifer file.')
     classify_op.add_argument('-r', dest='ref', type=str, required=True,
@@ -175,6 +175,8 @@ if __name__ == '__main__':
     
     tree_op.add_argument('--remov_recomb', required=False,  action='store_true', default=False,
                         help='Remove recombination events from the tree.')
+    tree_op.add_argument('--outgroup', type=float, default=None, required=False,
+                          help='Specify a comma separated list of samples to be considered outgroups; i.e. not included in tree building.')
 
     # Plot arguments
     plot_op.add_argument('-f', dest='infreq', type=str, required=True,
@@ -218,7 +220,7 @@ if __name__ == '__main__':
     
     if args.operation=='classify':
         
-        results = classify.Classify(path_to_pileup=args.input,
+        results = classify.Classify(path_to_bam=args.input,
                                     path_to_classifier=args.classifier,
                                     ref_file=args.ref,
                                     path_to_frequencies=args.output,
@@ -263,6 +265,7 @@ if __name__ == '__main__':
                                 output_renaming_file=args.renaming,
                                 input_phylip=args.inphylip,
                                 output_tree=args.outtree,
+                                outgroup_str=args.outgroup,
                                 rescale_bool=args.rescale,
                                 min_cov_to_include=args.min_cov,
                                 min_maf_for_call=args.minAF,
