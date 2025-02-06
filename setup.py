@@ -10,6 +10,7 @@ setup(
     author_email='equ@mit.edu',
     license='MIT',
     scripts=['bin/phlame'],
+    python_requires='>=3.8, <3.13',
     install_requires=[
     'numpy',
     'pandas',
