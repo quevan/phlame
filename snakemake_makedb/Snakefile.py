@@ -41,14 +41,7 @@ rule all:
 		expand("data/{sampleID}/R2.fq.gz",sampleID=SAMPLE_ls),
 		# # Through mapping steps # #
 		expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=REF_Genome_ls)
-		# # CMT # #
-		# # Tree # #
-		# "8-tree/parsimony.tre",
-		# # With QC # #
-		# "1-Mapping/bowtie2/alignment_stats.csv",
-		# # Including cleanup # #
-		# "logs/cleanUp_done.txt",
-
+		
 
 rule make_data_links:
 	# NOTE: All raw data needs to be named fastq.gz. No fq! The links will be named fq though.

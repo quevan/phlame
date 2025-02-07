@@ -34,16 +34,9 @@ assert len(set(CLASSIFIER_ls)) == 1
 
 rule all:
 	input:
-		# # Only data links # #
-		expand("data/{sampleID}/R1.fq.gz",sampleID=SAMPLE_ls),
-		expand("data/{sampleID}/R2.fq.gz",sampleID=SAMPLE_ls),
-		# # Through all steps # #
-		expand("3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
-		expand("6-frequencies/{sampleID}_ref_{reference}_frequencies.csv", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
-		# # Including cleanup # #
-		# "logs/cleanUp_done.txt",
-		# # With QC # #
-		"3-bowtie2/alignment_stats.csv",
+		expand("4-frequencies/{sampleID}_ref_{reference}_frequencies.csv", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
+		# expand("4-frequencies/{sampleID}_ref_{reference}_plot.pdf", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls))
+
 
 rule make_data_links:
 	# NOTE: All raw data needs to be named fastq.gz. No fq! 
@@ -182,10 +175,10 @@ rule classify:
 	conda:
 		"envs/phlame.yaml"
 	output:
-		frequencies="6-frequencies/{sampleID}_ref_{reference}_frequencies.csv",
-		data="6-frequencies/{sampleID}_ref_{reference}_fitinfo.data",
+		frequencies="4-frequencies/{sampleID}_ref_{reference}_frequencies.csv",
+		data="4-frequencies/{sampleID}_ref_{reference}_fitinfo.data",
 	shell:
-		"mkdir -p 6-frequencies ;"
+		"mkdir -p 4-frequencies ;"
 		"phlame classify "
 			"-i {input.bam} "
 			"-c {params.cfr} "
@@ -193,7 +186,7 @@ rule classify:
 			"-m mle "
 			"-o {output.frequencies} "
 			"-p {output.data} "
-			"--max_pi 0.3 "
+			"--max_pi 0.35 "
 			"--min_prob 0.5 "
 			"--min_snps 10 ;"
 
@@ -206,9 +199,9 @@ rule plot:
 	conda:
 		"envs/phlame.yaml"
 	output:
-		plot="6-frequencies/{sampleID}_ref_{reference}_plot.pdf",
+		plot="4-frequencies/{sampleID}_ref_{reference}_plot.pdf",
 	shell:
-		"mkdir -p 6-frequencies ;"
+		"mkdir -p 4-frequencies ;"
 		"phlame plot "
 			"-f {input.bam} "
 			"-d {params.cfr} "
