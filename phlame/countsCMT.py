@@ -8,16 +8,18 @@ import gzip
 import os
 import pickle
 import phlame.helper_functions as helper
+import glob
+
 
 #%% combine_positions.py
 
 class CombinePositions():
 
     def __init__(self,
-                 path_to_diversity_files,
+                 diversity_files,
                  path_to_ref):
         
-        self.diversity_files = helper.parse_file_list(path_to_diversity_files)
+        self.diversity_files = diversity_files
         self.path_to_ref = path_to_ref
 
         self.chr_starts, self.genome_length, self.scaf_names = helper.genomestats(self.path_to_ref)
@@ -234,7 +236,6 @@ class Pileup2Diversity:
         
         variant_pos = self.generate_positions_single_sample(self.path_to_variant_vcf)
         
-        # print(variant_pos)
 
         if self.path_to_output_diversity:
 
@@ -250,7 +251,6 @@ class Pileup2Diversity:
                      'quals': quals_sample,
                      'variant_pos': variant_pos}
         
-        print(diversity['variant_pos'])
 
         with gzip.open(path_to_output_diversity, 'wb') as f:
             
@@ -528,7 +528,8 @@ class Case():
         self.path_to_sample_names_file = path_to_sample_names
         
         self.path_to_diversity_files = path_to_diversity_files
-        self.diversity_files = helper.parse_file_list(self.path_to_diversity_files)
+        self.diversity_files = helper.parse_file_list(self.path_to_diversity_files,
+                                                      check_files=True)
 
         self.path_to_out_cmt = path_to_out_cmt
         self.path_to_ref = path_to_ref
@@ -537,32 +538,26 @@ class Case():
 
         self.chr_starts, self.genome_length, self.scaf_names = helper.genomestats(self.path_to_ref)
 
-    # def sample_names_check(self):
-
-    #     counter = 0
-    #     for i, sample_name in enumerate(self.sample_names):
-
-    #         while counter <= 3:
-    #             if not (sample_name in str(self.diversity_files[i])):
-    #                 print(f"Warning! Sample name {sample_name} not found in the name of corresponding diversity file {self.diversity_files[i]}. Continuing...")
-    #                 counter += 1
-
-    #         if counter > 3:
-    #             print("Not printing any further warnings...")
-            
     def main(self):
 
         # Get sample names
         print('Processing sample names...')
         with open(self.path_to_sample_names_file, 'r') as f:
-            self.sample_names = f.read().splitlines()
+            file_list = f.read().splitlines()
+
+        self.sample_names = [file_ for file_ in file_list if file_ != None]
+
         nsamples = len(self.sample_names)  # save number of samples
+
+        if len(self.sample_names) != len(self.diversity_files):
+            raise IOError("Number of samples  does not match number of diversity files.")
+
         print('Total number of samples: ' + str(nsamples))
 
 
         # Get all candidate SNP positions
         print('Processing candidate SNP positions...')
-        combine = CombinePositions(self.path_to_diversity_files, self.path_to_ref)
+        combine = CombinePositions(self.diversity_files, self.path_to_ref)
         self.p = combine.main()
 
 
@@ -626,9 +621,9 @@ class Case():
 
     def write_CMT(self):
 
-        outdir = os.path.dirname(self.path_to_out_cmt)
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
+        # outdir = os.path.dirname(self.path_to_out_cmt)
+        # if not os.path.exists(outdir):
+        #     os.makedirs(outdir)
 
         CMT = {'sample_names': self.sample_names,
                'p': self.p,

@@ -39,7 +39,8 @@ class MakeDB():
                  min_strand_cov_for_call=2,
                  max_qual_for_call=-30,
                  max_frac_ambiguous=0.5,
-                 max_outgroup=False
+                 max_outgroup=False,
+                 midpoint_root=False
                  ):
 
         self.__path_to_cmt = path_to_cmt
@@ -55,6 +56,7 @@ class MakeDB():
         self.min_branch_len = min_branch_len
         self.min_nsamples = min_nsamples
         self.min_support = min_support
+        self.midpoint_root = midpoint_root
         
         # Database parameters
         self.min_snps = min_snps
@@ -78,8 +80,11 @@ class MakeDB():
         self.sample_names = helper.rphylip(self.CMT.sample_names)
         
         self.tree = ete3.Tree(self.__path_to_tree, format=0)
-        # midpoint_root = self.tree.get_midpoint_outgroup()
-        # self.tree.set_outgroup(midpoint_root)
+        
+        if self.midpoint_root:
+            midpoint_root = self.tree.get_midpoint_outgroup()
+            self.tree.set_outgroup(midpoint_root)
+        
         self.tree.standardize()
             
     def main(self):
