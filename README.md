@@ -69,9 +69,9 @@ Now that we have both our candidate mutation table and our tree, we can run the 
 
 It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at our phylogeny will give us important information, including whether the species has noticeable intraspecies population structure in the first place. Our rooted phylogeny in `example/` looks like this:
 
-![Alt text](example/tree.pdf)
+![alt text](example/tree.png)
 
-It looks like there are 3 distinct clades in our phylogeny, with the lowest having a branch length of ~600 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
+At a quick glance, it looks like there are 3 obvious clades in our phylogeny, separated by a minimum branch length of ~623 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 ```
 phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
