@@ -13,6 +13,7 @@ $ pip install phlame
 ```
 
 ## Dependencies
+* python >=3.8, <3.13
 * numpy - (tested with v1.20.3)
 * matplotlib - (tested with v3.4.2)
 * pandas - (tested with v1.2.5)
@@ -113,11 +114,16 @@ The 3 fields that PHLAME will return are: [1] the estimated relative abundance o
 
 ### 3. Visualizing classification results
 
-The compressed data file has lots of useful information that will add context to detection decisions. You can view the output of a data file with the command `phlame plot`.
+The compressed data file has lots of useful information that can be used to help visualize detection decisions. You can view the output of a data file with the command `phlame plot`; this is generally much more useful when running the bayesian version of the classify step, as you will be able to visualize full posteriors over Divergence and relative abundance. For this, a pre-made data file has been included in `example`
 
 ```
-phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo.data -o skin_mg_frequencies_plot.pdf
+phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo_bayesian.data -o skin_mg_frequencies_plot.pdf
 ```
+
+![alt text](example/plot.png)
+
+Each clade will have four relevant plots. From left to right, they are: [1] A histogram of the actual number of reads supporting each clade-specific allele (red), as well as all alleles at the same positions (grey). [2]
+
 
 
 
