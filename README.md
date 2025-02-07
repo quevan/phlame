@@ -120,6 +120,3 @@ phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo.data -o skin_mg_freque
 ```
 
 
-
-
-
