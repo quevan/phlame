@@ -113,6 +113,7 @@ class PlotSample():
         fig.set_size_inches(12, (nplots*2)+2)
         
         # Iterate through clades
+        self.mle_flag = False
         for c, clade in enumerate(clade_names):
             
             # Plot counts histogram
@@ -126,6 +127,12 @@ class PlotSample():
             axs[c,0].set_xlabel('Counts', **self.hfont)
             axs[c,0].set_ylabel('# of SNVs', **self.hfont)
             axs[c,0].tick_params('both', **{'labelsize':12})
+
+            if data.mode=='mle':
+                if not self.mle_flag:
+                    print('Looks like this data file was not fit with MCMC. Posterior distributions will not be shown')
+                self.mle_flag = True
+                continue
 
             # Bin MCMC chain
             nchain = len(np.array(data.chain)[model_bool][c]['pi'])
@@ -170,11 +177,11 @@ class PlotSample():
                         pi_bins[0],  
                         color='g', label='Posterior dist.')
             axs[c,1].text(0.99, 0.8, 
-                        f"P($\pi$<{max_pi})={prob:.2f}", 
+                        f"P(pi<{max_pi})={prob:.2f}", 
                         ha='right', va='bottom', 
                         transform=axs[c,1].transAxes,**self.hfont)
             axs[c,1].axvline(max_pi, color='k', ls='--', label='max_pi')
-            axs[c,1].set_xlabel('$\pi$',**self.hfont); axs[c,1].set_ylabel('Density',**self.hfont)
+            axs[c,1].set_xlabel('pi',**self.hfont); axs[c,1].set_ylabel('Density',**self.hfont)
             axs[c,1].set_xlim(0,1)
             axs[c,1].plot( hpd, [0.1,0.1], color='k', 
                         alpha=0.5, linewidth=4, label='HPD')
@@ -184,7 +191,7 @@ class PlotSample():
             axs[c,2].plot(lambda_bins[1][:-1],
                             lambda_bins[0], 
                             color='b', label='MCMC')
-            axs[c,2].set_xlabel('$\lambda$',**self.hfont); axs[c,2].set_ylabel('Density',**self.hfont)
+            axs[c,2].set_xlabel('lambda',**self.hfont); axs[c,2].set_ylabel('Density',**self.hfont)
             # axs[c,2].legend()
 
             # alpha posterior

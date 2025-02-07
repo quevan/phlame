@@ -1,3 +1,9 @@
+## [1.0.4] - 2024-02-07
+- Updated snakemakes and README
+
+## [1.0.3] - 2024-02-07
+- plot willl still make a less informative plot when looking at a mle data file
+
 ## [1.0.2] - 2024-02-05
 - Fixed .bam file input in classify
 - Updated README

@@ -13,6 +13,7 @@ $ pip install phlame
 ```
 
 ## Dependencies
+* python >=3.8, <3.13
 * numpy - (tested with v1.20.3)
 * matplotlib - (tested with v3.4.2)
 * pandas - (tested with v1.2.5)
@@ -69,9 +70,9 @@ Now that we have both our candidate mutation table and our tree, we can run the 
 
 It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at our phylogeny will give us important information, including whether the species has noticeable intraspecies population structure in the first place. Our rooted phylogeny in `example/` looks like this:
 
-![Alt text](example/tree.pdf)
+![alt text](example/tree.png)
 
-It looks like there are 3 distinct clades in our phylogeny, with the lowest having a branch length of ~600 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
+At a quick glance, it looks like there are 3 obvious clades in our phylogeny, separated by a minimum branch length of ~623 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 ```
 phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
@@ -113,10 +114,15 @@ The 3 fields that PHLAME will return are: [1] the estimated relative abundance o
 
 ### 3. Visualizing classification results
 
-The compressed data file has lots of useful information that will add context to detection decisions. You can view the output of a data file with the command `phlame plot`.
+The compressed data file has lots of useful information that can be used to help visualize detection decisions. You can view the output of a data file with the command `phlame plot`; this is generally much more useful when running the bayesian version of the classify step, as you will be able to visualize full posteriors over Divergence and relative abundance. For this, a pre-made data file has been included in `example`
 
 ```
-phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo.data -o skin_mg_frequencies_plot.pdf
+phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo_bayesian.data -o skin_mg_frequencies_plot.pdf
 ```
+
+![alt text](example/plot.png)
+
+Each clade will have four relevant plots. From left to right, they are: [1] A histogram of the actual number of reads supporting each clade-specific allele (red), as well as all alleles at the same positions (grey). [2] The posterior probability over the pi parameter (equivalent to DVb) [3] The posterior probability over the lambda (rate) parameter and [4] The posterior probability density opver the relative abundance of the clade in the same. In this particular example, The posterior densities all have fairly high spreads because the sequencing depth is low. Visualizing the posterior densities helps us make detection decisions. For example, while clade C.2 is has enough density below our threshold to be detected, very little density is actually centered around pi values of 0. If we wanted to limit our detections to only strains that we think are for sure within the mRCA of C.2, we might reject this detection (for example, via the --hpd threshold in `phlame classify`)
+
 
 

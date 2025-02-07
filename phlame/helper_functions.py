@@ -45,6 +45,7 @@ class FrequenciesData():
             self.counts_MAP = fit_info_dct['counts_MAP']
             self.chain = fit_info_dct['chain']
             self.prob = fit_info_dct['prob']
+            self.mode = fit_info_dct['mode']
 
 
 # class CountsMat():

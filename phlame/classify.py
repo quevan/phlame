@@ -367,7 +367,7 @@ class Classify:
                 save_pi[c] = np.round(fit.pi,4)
                 # print(fit.counts_MAP.keys())
                 
-                # save_chain.append(fit.chain)
+                save_chain.append(fit.chain)
 
             # Otherwise is zero
             else:
@@ -376,6 +376,8 @@ class Classify:
                 # save_chain.append({})
                 save_hpd.append(np.array((-1,-1)))
                 save_cts_map.append({})
+
+                save_chain.append(None)
 
             # Save counts data
             save_cts.append( byclade_cts )
@@ -392,9 +394,10 @@ class Classify:
         self.fit_info = {'counts_MLE': save_counts_MLE,
                          'total_MLE':save_total_MLE,
                          'counts_MAP':save_cts_map,
-                         'chain':[],
+                         'chain':save_chain,
                          'prob':save_prob,
-                         'hpd':save_hpd}
+                         'hpd':save_hpd,
+                         'mode':self.mode}
     
     def save_frequencies(self):
         '''
