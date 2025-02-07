@@ -164,9 +164,6 @@ class MakeDB():
         # Get csSNPs for every clade
         # =========================================================================
         
-        print(len(self.sample_names))
-        print(len(self.ingroup_sample_names))
-
         #Call csSNPs
         print('Getting unanimous alleles...')
         unanimous_alleles = unanimous_to_clade(calls, self.ingroup_sample_names,

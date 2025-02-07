@@ -138,7 +138,8 @@ if __name__ == '__main__':
                             help='Minimum MAPQ score to make a base call.')
     makedb_op.add_argument('--max_frac_ambiguous', type=float, default=0.5, required=False,
                             help='Maximum fraction of ambiguous (N) calls to include a sample.')
-    
+    makedb_op.add_argument('--midpoint', required=False,  action='store_true', default=False,
+                            help='Root the input tree at the midpoint.')
 
     # Tree arguments
     tree_op.add_argument('-i', dest='cmt', type=str, required=False, default=None, 
@@ -254,7 +255,8 @@ if __name__ == '__main__':
                            min_strand_cov_for_call=args.min_strand_cov,
                            max_qual_for_call=args.qual,
                            max_frac_ambiguous=args.max_frac_ambiguous,
-                           max_outgroup=args.max_outgroup)
+                           max_outgroup=args.max_outgroup,
+                           midpoint_root=args.midpoint)
 
         db.main()
         

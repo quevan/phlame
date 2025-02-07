@@ -1,5 +1,5 @@
 ####################################################
-# Phlame Snakefile (Make Classifier / Part 1)#
+# PHLAME Snakefile (Make DB)
 ####################################################
 
 
@@ -40,14 +40,12 @@ rule all:
 		expand("data/{sampleID}/R1.fq.gz",sampleID=SAMPLE_ls),
 		expand("data/{sampleID}/R2.fq.gz",sampleID=SAMPLE_ls),
 		# # Through mapping steps # #
-		expand("1-Mapping/quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-		expand("1-Mapping/diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.gz", zip, sampleID=SAMPLE_ls, reference=REF_Genome_ls),
+		expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=REF_Genome_ls)
 		# # CMT # #
-		"2-Case/candidate_mutation_table/candidate_mutation_table.pickle.gz",
 		# # Tree # #
 		# "8-tree/parsimony.tre",
 		# # With QC # #
-		"1-Mapping/bowtie2/alignment_stats.csv",
+		# "1-Mapping/bowtie2/alignment_stats.csv",
 		# # Including cleanup # #
 		# "logs/cleanUp_done.txt",
 
@@ -197,10 +195,10 @@ rule mpileup2vcf:
 		fasta_idx = ancient(rules.samtools_idx.output.fasta_idx),
 	output:
 		pileup="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-		variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
-		vcf_strain="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
+		vcf="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
+		vcf_variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
 	params:
-		vcf_raw="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
+		vcf_tmp="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
 	benchmark:
 		"benchmarks/rule_mpileup2vcf_{sampleID}_{reference}.benchmark",
 	conda:
@@ -209,203 +207,34 @@ rule mpileup2vcf:
 		"minimal", # avoids leaving leftover temp files esp if job aborted
 	shell:
 		" samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bamA} > {output.pileup} ;" 
-		" samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bamA} > {params.vcf_raw} ;"
-		" bcftools call -c -Oz -o {output.vcf_strain} {params.vcf_raw} ;"
-		" bcftools view -Oz -v snps -q .75 {output.vcf_strain} > {output.variants} ;"
-		" tabix -p vcf {output.variants} ;"
-		" rm {params.vcf_raw} ;"
+		" samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bamA} > {params.vcf_tmp} ;"
+		" bcftools call -c -Oz -o {output.vcf} {params.vcf_tmp} ;"
+		" bcftools view -Oz -v snps -q .75 {output.vcf} > {output.vcf_variants} ;"
+		" tabix -p vcf {output.vcf_variants} ;"
+		" rm {params.vcf_tmp} ;"
 
-rule vcf2quals:
-	input:
-		vcf_strain="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
-	params:
-		refGenomeDir = REF_GENOME_DIRECTORY+"/{reference}/", 
-	output:
-		file_quals = "1-Mapping/quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals",
-	conda:
-		"envs/py_for_snakemake.yaml",
-	benchmark:
-		"benchmarks/rule_vcf2quals_{sampleID}_{reference}.benchmark",
-	shell:
-		"mkdir -p 1-Mapping/quals ;"
-		"python {SCRIPTS_DIRECTORY}/ss_vcf2quals_snakemake.py -i {input.vcf_strain} -r {params.refGenomeDir} -o {output.file_quals} ;"
-		
-
-rule pileup2diversity_matrix:
+rule counts:
 	input:
 		pileup="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
+		vcf="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
+		vcf_variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
 	params:
-		refGenomeDir=REF_GENOME_DIRECTORY+"/{reference}/",
+		refGenome=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
 	output:
-		file_diversity = "1-Mapping/diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.gz",
-		file_coverage = "1-Mapping/diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.coverage.gz",
+		counts="1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts"
 	conda:
-		"envs/py_for_snakemake.yaml",
-	benchmark:
-		"benchmarks/rule_pileup2diversity_{sampleID}_{reference}.benchmark",
+		"envs/phlame.yaml"
 	shell:
-		"mkdir -p 1-Mapping/diversity ;"
-		"python {SCRIPTS_DIRECTORY}/ss_pileup2diversity.py -i {input.pileup} -r {params.refGenomeDir} -o {output.file_diversity} -c {output.file_coverage} ;"
+		"phlame counts -p {input.pileup} -v {input.vcf} -w {input.vcf_variants} -r {params.refGenome} -o {output.counts}"
 
-
-rule include_outgroup:
-	input:
-		#just here to make sure happens after mapping step 
-		vcf=expand("1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-		qual=expand("1-Mapping/quals/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.quals",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-		div=expand("1-Mapping/diversity/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.diversity.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls),
-	output:
-		vcf_links = expand("2-Case/temp/vcf/{sampleID}_ref_{reference}_outgroup{outgroup}.vcf.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-		qual_mat_links = expand("2-Case/temp/qual/{sampleID}_ref_{reference}_outgroup{outgroup}.quals",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-		div_mat_links = expand("2-Case/temp/diversity/{sampleID}_ref_{reference}_outgroup{outgroup}.diversity.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-	log:
-		"logs/build_links.log"
-	run:
-		import subprocess
-		#subprocess.run( "rm -fr 2-Case/temp/ " ,shell=True) # clean it up prior run
-		subprocess.run( "mkdir -p 2-Case/temp/diversity/ 2-Case/temp/qual/ 2-Case/temp/diversity/ " ,shell=True)
-		for i in range(len(SAMPLE_ls)):
-			subprocess.run( "ln -fs -T " + CURRENT_DIRECTORY + "/1-Mapping/diversity/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*diversity.gz 2-Case/temp/diversity/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".diversity.gz" ,shell=True)
-			subprocess.run( "ln -fs -T " + CURRENT_DIRECTORY + "/1-Mapping/quals/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*quals 2-Case/temp/qual/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".quals" ,shell=True)
-			subprocess.run( "ln -fs -T " + CURRENT_DIRECTORY + "/1-Mapping/vcf/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "*variant.vcf.gz 2-Case/temp/vcf/" + SAMPLE_ls[i] + "_ref_" + REF_Genome_ls[i] + "_outgroup" + OUTGROUP_ls[i] + ".vcf.gz " ,shell=True)
-
-rule variants2positions:
-	input:
-		variants = "2-Case/temp/vcf/{sampleID}_ref_{reference}_outgroup{outgroup}.vcf.gz",
-	params:
-		refGenomeDir = REF_GENOME_DIRECTORY + "/{reference}/",
-		maxFQ=-30,
-		outgroup_tag = "{outgroup}", # boolean (0==ingroup or 1==outgroup)
-	output:
-		positions = "2-Case/temp/positions/{sampleID}_ref_{reference}_outgroup{outgroup}_positions.pickle",
-	conda:
-		"envs/py_for_snakemake.yaml",
-	benchmark:
-		"benchmarks/rule_variants2positions_{sampleID}_{reference}_{outgroup}.benchmark",
-	shell:
-		"mkdir -p 2-Case/temp/positions/ ;"
-		"python scripts/ss_variants2positions.py -i {input.variants} -o {output.positions} -r {params.refGenomeDir} -q {params.maxFQ} -b {params.outgroup_tag} ;"    
-
-rule combine_positions_prep:
-	input:
-		mat_positions = expand("2-Case/temp/positions/{sampleID}_ref_{reference}_outgroup{outgroup}_positions.pickle",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls)
-	params:	
-		outgroup_bool = expand( "{outgroup}" , outgroup=OUTGROUP_ls ),
-	output:
-		string_input_pos = "2-Case/temp/positions/string_file_other_p_to_consider.txt",
-		string_outgroup_bool = "2-Case/temp/positions/string_outgroup_bool.txt",
-	run:
-		with open( output.string_input_pos ,"w") as f: 
-			print(*input.mat_positions, sep="\n", file=f)
-		with open( output.string_outgroup_bool ,"w") as f:
-			print(*params.outgroup_bool, sep="\n", file=f)
-
-rule combine_positions:
-	input:
-		string_input_pos = "2-Case/temp/positions/string_file_other_p_to_consider.txt",
-		string_outgroup_bool = "2-Case/temp/positions/string_outgroup_bool.txt",
-	params:
-		# file_other_p_to_consider = "add_positions/other_positions.mat",
-		refGenomeDir = expand(REF_GENOME_DIRECTORY + "/{reference}/",reference=set(REF_Genome_ls)), # expands to single reference genome!
-	output:
-		allpositions = "2-Case/temp/allpositions.pickle",
-	benchmark:
-		"benchmarks/rule_combine_positions.benchmark",
-	conda:
-		"envs/py_for_snakemake.yaml",
-	shell:
-		"python scripts/ss_combine_positions.py "
-			"-i {input.string_input_pos} "
-			"-r {params.refGenomeDir} "
-			"-b {input.string_outgroup_bool} "
-			"-o {output.allpositions} ;"
-
-# build input for candidate_mutation_table
-rule candidate_mutation_table_prep:
-	input:
-		diversity=expand("2-Case/temp/diversity/{sampleID}_ref_{reference}_outgroup{outgroup}.diversity.gz",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-		quals=expand("2-Case/temp/qual/{sampleID}_ref_{reference}_outgroup{outgroup}.quals",zip,sampleID=SAMPLE_ls, reference=REF_Genome_ls, outgroup=OUTGROUP_ls),
-	params:
-		sampleID_names=expand( "{sampleID}" , sampleID=SAMPLE_ls ),
-	output:
-		string_diversity="2-Case/temp/string_diversity_mat.txt",
-		string_quals="2-Case/temp/string_qual_mat.txt",
-		string_sampleID_names="2-Case/temp/string_sampleID_names.txt",
-	benchmark:
-		"benchmarks/rule_candidate_mutation_table_prep.benchmark",
-	run:
-		with open( output.string_diversity ,"w") as f: 
-			print(*input.diversity, sep="\n", file=f)
-		with open( output.string_quals ,"w") as f:
-			print(*input.quals, sep="\n", file=f)
-		with open( output.string_sampleID_names ,"w") as f: 
-			print(*params.sampleID_names, sep="\n", file=f)
 
 rule candidate_mutation_table:
 	input:
-		positions = rules.combine_positions.output.allpositions,
-		string_diversity = rules.candidate_mutation_table_prep.output.string_diversity,
-		string_quals = rules.candidate_mutation_table_prep.output.string_quals,
-		string_sampleID_names = rules.candidate_mutation_table_prep.output.string_sampleID_names,
-		string_outgroup_bool = rules.combine_positions_prep.output.string_outgroup_bool,
+		expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=REF_Genome_ls)
 	output:
-		cmt="2-Case/candidate_mutation_table/candidate_mutation_table.pickle.gz",
+		cmt="2-Case/candidate_mutation_table.pickle.gz",
 	conda:
-		"envs/py_for_snakemake.yaml",
-	benchmark:
-		"benchmarks/rule_candidate_mutation_table.benchmark",
+		"envs/phlame.yaml"
 	shell:
-		# -c/-n optional flag to build cov/norm matrix in folder of cmt. check -h for help.
-		"python3 scripts/build_candidate_mutation_table.py "
-			"-p {input.positions} "
-			"-s {input.string_sampleID_names} "
-			"-g {input.string_outgroup_bool} "
-			"-q {input.string_quals} "
-			"-d {input.string_diversity} "
-			"-o {output.cmt} ;"
+		"phlame cmt -i counts_files.txt -s sample_names.txt -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz"
 		
-
-################
-# Post-case step
-################
-
-rule cmt2tree:
-	input:
-		cmt="2-Case/candidate_mutation_table/candidate_mutation_table.pickle.gz",
-	params:
-		ref=REF_GENOME_DIRECTORY+"/{REF_Genome_ls[0]}/genome.fasta",
-		align="1-Mapping/bowtie2/alignment_stats.csv",
-		dnapars_exe="/scratch/mit_lieberman/projects/evan/tools/phylip-3.697/exe/dnapars",
-		phylip_prefix="8-tree/good_positions_for_tree",
-		rename_prefix="8-tree/phylip2names.txt",
-		tree_prefix="8-tree/parsimony",
-	output:
-		tree="8-tree/parsimony.tre",
-	conda:
-		"envs/py_for_snakemake.yaml",
-	benchmark:
-		"benchmarks/cmt2phylip.benchmark",
-	shell:
-		"ln -s {params.dnapars_exe} ./dnapars ;"
-		"mkdir -p 8-tree ;"
-		"python scripts/cmt2tree.py -i {input.cmt} -p {params.phylip_prefix} -o {params.tree_prefix} -n {params.rename_prefix} -r {params.ref} -a {params.align};"
-		# optional arguments
-		# --min_cov --min_maf --min_strand_cov --min_qual --min_presence_core --min_median_cov_samples --filter_indels (bool)
-
-
-# rule define_levels:
-
-
-# rule get_clade_specific_snps:
-
-# rule cleanUp:
-#     input:
-#         candidate_mutation_table = "2-candidate_mutation_table/candidate_mutation_table.pickle.gz",
-#     params:
-#         temp_folder = "1-temp_pos",
-#     output:
-#         "logs/DONE_cleanUp"
-#     shell:
-#         " rm -rf {params.temp_folder} ; touch {output} "
-
-

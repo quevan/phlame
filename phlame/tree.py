@@ -559,9 +559,6 @@ class CMT2tree():
         
         basename = os.path.basename(self.output_tree)
 
-        print(shlex.quote(working_dir))
-        print(shlex.quote(basename))
-
         # Run RAxML
         print("Running RAxML as follows: " + 
               "raxmlHPC -s " + 
@@ -616,8 +613,7 @@ class CMT2tree():
         # Replace with representative isolate name
         for i in self.phylip2names.keys():
             tre=tre.replace(i,self.phylip2names[i])
-            print(self.phylip2names[i])
-        print(tre)
+
         # Write out new tree
         with open(self.output_tree,'w') as f:
             f.write(tre)
