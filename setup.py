@@ -19,7 +19,7 @@ setup(
     'biopython',
     'ete3',
     'statsmodels',
-    'pytest'
+    'pytest',
     ],
 
 )

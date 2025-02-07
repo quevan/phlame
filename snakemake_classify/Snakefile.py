@@ -1,6 +1,7 @@
 ############################################
-# PHLAME Snakefile (Classify / Part 2)#
+# PHLAME Snakefile (Classify)#
 ############################################
+
 import sys
 import os
 import glob
@@ -38,28 +39,11 @@ rule all:
 		expand("data/{sampleID}/R2.fq.gz",sampleID=SAMPLE_ls),
 		# # Through all steps # #
 		expand("3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
-		expand("5-counts/{sampleID}_ref_{reference}.counts.pickle.gz", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
 		expand("6-frequencies/{sampleID}_ref_{reference}_frequencies.csv", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
 		# # Including cleanup # #
 		# "logs/cleanUp_done.txt",
 		# # With QC # #
 		"3-bowtie2/alignment_stats.csv",
-
-rule get_positions:
-	input:
-		cfrs = CLASSIFIER_ls[0],
-		#cfs can also be specified 
-	params:
-		refGenome_file = (REFGENOME_DIR + "/" + REF_GENOME_ls[0]),
-	output:
-		all_positions="data/positions/allpositions.txt",
-		chr_positions="data/positions/chrpositions.txt",
-	run:
-		from phlame_SM_module import get_positions
-		get_positions(input.cfrs, 
-					  output.all_positions, 
-					  output.chr_positions, 
-					  params.refGenome_file)
 
 rule make_data_links:
 	# NOTE: All raw data needs to be named fastq.gz. No fq! 
@@ -189,42 +173,12 @@ rule sam2bam:
             " rm {input.samA} ;"
             " rm {params.bamDup} {params.bamDupMate} {params.bamDupMateSort} ;"
 
-rule mpileup:
-	input:
-		bamA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam",
-		ref=rules.refGenome_index.input.fasta,
-		pos2grab="data/positions/chrpositions.txt",
-	output:
-		pileup="4-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-	conda:
-		"envs/samtools15_bcftools12.yaml"
-	shell:
-		" samtools faidx {input.ref} ; "
-		" samtools mpileup -q30 -x -s -O -d3000 "
-			"-l {input.pos2grab} "
-			"-f {input.ref} {input.bamA} > {output.pileup} ;" 
-
-rule counts:
-	input:
-		pileup = "4-vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-	params:
-		refGenomeDir=expand(REFGENOME_DIR + "/{reference}/",reference=set(REF_GENOME_ls)),
-		cfrs = CLASSIFIER_ls[0],
-	output:
-		phlame_cts = "5-counts/{sampleID}_ref_{reference}.counts.pickle.gz",
-	shell:
-		"python scripts/phlame_counts.py "
-			"-i {input.pileup} "
-			"-r {params.refGenomeDir} "
-			"-c {params.cfrs} "
-			"-o {output.phlame_cts}; "
-
 rule classify:
 	input:
-		counts = rules.counts.output.phlame_cts,
+		bam = "3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam",
 	params:
 		cfr = "Gardnerella_classifiers/Gvaginalis_HKY85.classifier",
-		# level="Cacnes_classifiers/Cacnes_ALL_phylogroup_IDs.txt",
+		refGenome="data/references/{reference}/genome.fasta"
 	conda:
 		"envs/phlame.yaml"
 	output:
@@ -232,24 +186,33 @@ rule classify:
 		data="6-frequencies/{sampleID}_ref_{reference}_fitinfo.data",
 	shell:
 		"mkdir -p 6-frequencies ;"
-		"phlame_.py classify "
-			"-i {input.counts} "
+		"phlame classify "
+			"-i {input.bam} "
 			"-c {params.cfr} "
-			# "-l {params.level} "
+			"-r {params.refGenome} "
+			"-m mle "
 			"-o {output.frequencies} "
 			"-p {output.data} "
 			"--max_pi 0.3 "
 			"--min_prob 0.5 "
 			"--min_snps 10 ;"
 
-# rule cleanUp:
-#     input:
-#         candidate_mutation_table = "7-candidate_mutation_table/candidate_mutation_table.pickle.gz",
-#     params:
-#         temp_folder = "6-case_temp/",
-#         cutad="1-cutadapt_temp/",
-#         sickle="2-sickle2050_temp/",
-#     output:
-#         "logs/cleanUp_done.txt",
-#     shell:
-#         " rm -rf {params.temp_folder} {params.cutad} {params.sickle}; touch {output} ;"
+rule plot:
+	input:
+		frequencies = rules.classify.output.frequencies,
+		data = rules.classify.output.data,
+	params:
+		refGenome="data/references/{reference}/genome.fasta"
+	conda:
+		"envs/phlame.yaml"
+	output:
+		plot="6-frequencies/{sampleID}_ref_{reference}_plot.pdf",
+	shell:
+		"mkdir -p 6-frequencies ;"
+		"phlame plot "
+			"-f {input.bam} "
+			"-d {params.cfr} "
+			"-p {params.refGenome}"
+			"-o {output.plot} "
+			"--max_pi 0.3 "
+			"--min_prob 0.5 "

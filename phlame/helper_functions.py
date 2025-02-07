@@ -705,15 +705,20 @@ def p2chrpos(p, ChrStarts):
         chrpos = np.column_stack((chromo,p))
     return chrpos
 
-def parse_file_list(path_to_file):
+def parse_file_list(path_to_file, check_files=False):
     with open(path_to_file, 'r') as f:
         file_list = f.read().splitlines()
+
+    # Remove newlines
+    file_list = [file_ for file_ in file_list if file_ != '']
 
     for file_ in file_list:
         if not os.path.isabs(file_):
             abs_path = os.path.abspath(file_)
-            if not os.path.exists(abs_path):
-                raise FileNotFoundError(f"File not found: {abs_path}")
+            
+            if check_files:
+                if not os.path.exists(abs_path):
+                    raise FileNotFoundError(f"File not found: {abs_path}")
             file_list[file_list.index(file_)] = os.path.abspath(file_)
 
     return file_list

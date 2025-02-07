@@ -30,72 +30,86 @@ $ pip install phlame
 
 ## Tutorial
 
-This tutorial uses the small set of files in `examples/`. 
+This tutorial uses the small set of files found in `example/` and is made to be run inside the `example/` directory.
 
 ### 1. Building a database
 
-PHLAME uses a compressed object called a candidate mutation table to store allele information from many independent samples. To create one, we first need to use samtools/bcftools to extract pileups from aligned .bam files
+PHLAME uses a compressed object called a candidate mutation table to store allele information from many independent samples. To create one, we first need to use samtools/bcftools to extract pileups from aligned .bam files. See `snakemake_makedb` for an example of how to take raw sequencing reads to aligned .bam files.  
 ```
-$ samtools mpileup -q30 -x -s -O -d3000 -f Pacnes_C1.fasta skin_isolate_aligned.sorted.bam > skin_isolate_aligned.pileup
-$ samtools mpileup -q30 -t SP -d3000 -vf Pacnes_C1.fasta skin_isolate_aligned.sorted.bam > skin_isolate_aligned.vcf.tmp
-$ bcftools call -c -Oz -o skin_isolate_aligned.sorted.strain.vcf.gz skin_isolate_aligned.vcf.tmp
-$ bcftools view -Oz -v snps -q .75 skin_isolate_aligned.sorted.strain.vcf.gz > skin_isolate_aligned.sorted.strain.variant.vcf.gz
-$ tabix -p vcf skin_isolate_aligned.sorted.strain.variant.vcf.gz
-$ rm skin_isolate_aligned.vcf.tmp
+$ samtools mpileup -q30 -x -s -O -d3000 -f Pacnes_C1.fasta Cacnes_isolate_aligned.sorted.bam > Cacnes_isolate_aligned.pileup
+$ bcftools mpileup -q30 -t SP -d3000 -f Pacnes_C1.fasta Cacnes_isolate_aligned.sorted.bam > Cacnes_isolate_aligned.vcf.tmp
+$ bcftools call -c -Oz -o Cacnes_isolate_aligned.sorted.strain.vcf.gz Cacnes_isolate_aligned.vcf.tmp --ploidy 1
+$ bcftools view -Oz -v snps -q .75 Cacnes_isolate_aligned.sorted.strain.vcf.gz > Cacnes_isolate_aligned.sorted.strain.variant.vcf.gz
+$ tabix -p vcf Cacnes_isolate_aligned.sorted.strain.variant.vcf.gz
+$ rm Cacnes_isolate_aligned.vcf.tmp
 ```
 
 Pileup files can be quite large. We extract data from pileup files into a compressed format using the `counts` function in PHLAME.
 ```
-phlame counts -p skin_isolate_aligned.pileup -v skin_isolate_aligned.sorted.strain.vcf.gz -w skin_isolate_aligned.sorted.strain.variant.vcf.gz -r Pacnes_C1.fasta -o skin_isolate.counts
+phlame counts -p Cacnes_isolate_aligned.pileup -v Cacnes_isolate_aligned.sorted.strain.vcf.gz -w Cacnes_isolate_aligned.sorted.strain.variant.vcf.gz -r Pacnes_C1.fasta -o Cacnes_isolate.counts
 ```
 
-Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already made in `examples/counts/`
+Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already made in `example/counts/`
 ```
-phlame cmt -i examples/counts/*.counts -s 'A039,A441,A443,B089,F109,F189,L363' -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
+phlame cmt -i counts_files.txt -s 'A039,A441,A443,B089,F109,F189,L363' -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
 ```
 
 From a candidate mutation table, we can create a phylogeny and a PHLAME database using the commands `phlame tree` and `phlame makedb`, respectively.
 
 ```
-phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -o Cacnes.tree
+phlame cmt -i counts_files.txt -s sample_names.txt -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
 ```
 
-Using the integrated tree-building step requires RaXML installed. Alternatively, you can use `tree` to create a PHYLIP formatted file, which plugs into many different phylogenetic inference algorithms
+Using the integrated tree-building step requires RaXML installed. Alternatively, you can use `tree` to create a PHYLIP formatted file, which plugs into many different phylogenetic inference algorithms.
 ```
 phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.txt
 ```
 
 Now that we have both our candidate mutation table and our tree, we can run the `makedb` step, which will detect candidate clades in our phylogeny as well as clade-specific mutations for each clade.
 
-A key parameter to specify is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) to determine a good value. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade.
+It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at our phylogeny will give us important information, including whether the species has noticeable intraspecies population structure in the first place. Our rooted phylogeny in `example/` looks like this:
+
+![Alt text](example/tree.pdf)
+
+It looks like there are 3 distinct clades in our phylogeny, with the lowest having a branch length of ~600 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 ```
-phlame makedb -i Cacnes_CMT.pickle.gz -t Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 100
+phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
 
+After running makedb successfully, PHLAME will report the number of clade-specific mutations found for each clade. The identities of each clade can be found in the `cladeIDs.txt` file
+```
+Reading in files...
+Number of core positions: 16280/17491
+Getting unanimous alleles...
+Getting unique alleles...
+Classifier results:
+Clade C.1: 3959 csSNPs found
+Clade C.1.1: 844 csSNPs found
+Clade C.2: 3956 csSNPs found
+Clade C.2.1: 1338 csSNPs found
+Clade C.2.2: 3526 csSNPs found
+```
 ### 2. Classifying metagenome samples
 
-To classify a metagenomic sample, you will first have to align your metagenomic reads to the same species-specific reference genome used to build your classifier. PHLAME takes as input the aligned .bam file. The classify step outputs a frequencies file, as well as a compressed data file. 
+To classify a metagenomic sample, you will first have to align your metagenomic reads to the same species-specific reference genome used to build your classifier. PHLAME takes as input the aligned, indexed .bam file. See `snakemake_classify` for an example of how to take raw sequencing reads to aligned .bam files. 
 
-There are several options and parameters that can be set when running `phlame classify`. Two important ones are `-m`, which specifies whether PHLAME will run a maximum likelihood or Bayesian algorithm. The Bayesian algorithm takes longer to run but offers more information (see 3. Visualizing classification results). The parameter`--max-pi` defines the divergence limit past which strains in a sample will be considered too distant to be a member of the same clade (the default for this threshold is `0.35`).
+There are several options and parameters that can be set when running `phlame classify`. Two important ones are `-m`, which specifies whether PHLAME will run a maximum likelihood or Bayesian algorithm. The Bayesian algorithm takes longer to run but offers more information (see 3. Visualizing classification results). The parameter`--max-pi` defines the divergence limit past which strains in a sample will be considered too distant to be a member of the same clade (the default for this threshold is `0.35`). 
 
 ```
-phlame classify -i skin_mg_aligned.sorted.bam -c Cacnes_db.classifier -r Pacnes_C1.fasta -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data --max_pi 0.35
+phlame classify -i skin_mg_aligned.sorted.bam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m mle -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data --max_pi 0.35
 ```
 
-The output of a frequencies file will look like this:
+After running, the classify step will output a frequencies file, as well as a compressed data file. The output of a frequencies file will look like this:
 ```
-,Relative abundance,Estimated divergence,Confidence score
-C.1,0.0,[0.42201403 0.71522194],0.004111111111111111
-C.1.1,0.0,[0.7602548 0.8559106],0.0
-C.2,0.9992863197270372,[1.08247258e-08 1.40671647e-04],1.0
-C.2.1,0.05124272640768824,[5.98496803e-05 7.75948650e-04],1.0
-C.2.1.1,0.0,[0.34709593 0.60451219],0.03766666666666667
-C.2.1.1.1,0.0,[0.40496092 0.86246598],0.026555555555555554
-C.2.1.1.1.1,0.0,[0.38075201 0.85498158],0.03422222222222222
-C.2.1.1.2,0.0,[0.54419195 0.78240866],0.0
+,Relative abundance,DVb,Probability score
+C.1,0.0,0.6874,0.0
+C.1.1,0.0,-1.0,-1.0
+C.2,0.3690262106911293,0.3425,1.0
+C.2.1,0.0,0.5683,0.0
+C.2.2,0.0,0.6815,0.0
 ```
 
-The 3 fields that PHLAME will return are: [1] the estimated relative abundance of the clade in the sample, [2] DVb, which represents the estimated divergence of the sample from the MRCA of that clade, and [3] a Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. Note that Probability Score only has informative information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version.
+The 3 fields that PHLAME will return are: [1] the estimated relative abundance of the clade in the sample, [2] DVb, which represents the estimated divergence of the sample from the MRCA of that clade, and [3] a Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. Note that Probability Score only has informative information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version. The total relative abundances across any set of non-overlapping clades may not add up to 1. This is intended and suggests that the sample has intraspecies diversity that is sufficiently diverged from any of the clades in the reference set.
 
 ### 3. Visualizing classification results
 
@@ -104,11 +118,5 @@ The compressed data file has lots of useful information that will add context to
 ```
 phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo.data -o skin_mg_frequencies_plot.pdf
 ```
-
-The output plot will look something like this. 
-
-![Alt text](examples/example_plot.pdf)
-
-Going from left to right, the plots show 
 
 

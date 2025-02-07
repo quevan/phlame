@@ -347,7 +347,7 @@ class CMT2tree():
 
         self.raxml()
 
-        # print("Tree built. Renaming phylip names...")
+        print("Tree built. Renaming phylip names...")
         self.rename_phylip()
 
         
@@ -549,11 +549,15 @@ class CMT2tree():
         
         print("Running RAxML...")
 
-        working_dir = os.path.dirname(self.output_tree)
-        basename = os.path.basename(self.output_tree)
+        if os.path.isabs(self.output_tree):
 
-        print(shlex.quote(working_dir))
-        print(shlex.quote(basename))
+            working_dir = os.path.dirname(self.output_tree)
+
+        else:
+            
+            working_dir = os.path.join(os.getcwd(), os.path.dirname(self.output_tree))
+        
+        basename = os.path.basename(self.output_tree)
 
         # Run RAxML
         print("Running RAxML as follows: " + 
@@ -609,7 +613,7 @@ class CMT2tree():
         # Replace with representative isolate name
         for i in self.phylip2names.keys():
             tre=tre.replace(i,self.phylip2names[i])
-        
+
         # Write out new tree
         with open(self.output_tree,'w') as f:
             f.write(tre)
@@ -622,6 +626,8 @@ class CMT2tree():
 
         nums = np.arange(0,len(sample_names)).astype(str)
         sample_names_4phylip = np.char.add(nums, sample_names.astype(str))
+
+        sample_names_4phylip = np.array([name[:10] for name in sample_names_4phylip])
         
         return sample_names_4phylip.astype(object)
     

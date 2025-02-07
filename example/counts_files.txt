@@ -1,0 +1,8 @@
+counts/B072-Scr-Rc-4_t00_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/B080-Ext-RcBs-2_t00_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/B082-Ext-clNoBs-3_t00_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/F139-Stp-Lc14-2_t07_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/O383-Scr-Lc-5_t11_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/O386-Scr-Ch-5_t11_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/Q395-Ext-trBaB-5_t15_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
+counts/R410-Ext-blFoBs-5_t15_ref_Pacnes_C1_outgroup0.diversity.pickle.gz
