@@ -1,11 +1,13 @@
 # PHLAME: Novelty-aware intraspecies profiling from metagenomes
 
-PHLAME is a complete pipeline for the creation of intraspecies reference databases and the metagenomic detection of intraspecies clades, their relative frequency, and their estimated divergence from the reference phylogeny.
+PHLAME is a complete pipeline for the creation of intraspecies reference databases and the metagenomic detection of intraspecies clades, their relative frequency, and their estimated Divergence from the reference phylogeny.
 
 The accepted raw inputs to PHLAME are:
 * [1] A species-specific assembled reference genome in .fasta format
 * [2] A collection of whole genome sequences of the same species in .fastq or aligned .bam/.pileup format
 * [3] Metagenomic sequencing data in either .fastq or aligned .bam format.
+
+Link to preprint is [here](https://www.biorxiv.org/content/10.1101/2025.02.07.636498v1).
 
 ## Installation
 ```
@@ -28,6 +30,12 @@ $ pip install phlame
 
 * [RaXML](https://cme.h-its.org/exelixis/web/software/raxml/) - (tested with v8.2.13)
 * Additionally, starting with raw sequencing read data will require an aligner (like [bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml)).
+
+## Overview
+
+PHLAME constructs phylogenetic abundance profiles of individual species from metagenomic data. Unlike similar methods, PHLAME is *novelty-aware*, meaning that PHLAME will identify the phylogenetic resolution at which novel strains in a sample no longer share ancestry with the reference phylogeny. This functionality is made possible through PHLAME's Divergence (DVb) metric, which estimates the point on individual branches of a phylogeny for which novel strains in a sample are inferred to diverge from known references.
+
+![alt text](example/profile.png)
 
 ## Tutorial
 
@@ -68,11 +76,11 @@ phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.txt
 
 Now that we have both our candidate mutation table and our tree, we can run the `makedb` step, which will detect candidate clades in our phylogeny as well as clade-specific mutations for each clade.
 
-It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at our phylogeny will give us important information, including whether the species has noticeable intraspecies population structure in the first place. Our rooted phylogeny in `example/` looks like this:
+It is important to visualize your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at our phylogeny will give us important information, including whether the species has obvious population structure in the first place. Our rooted phylogeny in `example/` looks like this:
 
 ![alt text](example/tree.png)
 
-At a quick glance, it looks like there are 3 obvious clades in our phylogeny, separated by a minimum branch length of ~623 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
+At a quick glance, it looks like there are 3 distinct clades in our phylogeny, separated by a minimum branch length of ~623 mutations. By default, PHLAME will rescale branch lengths into absolute numbers of mutations when the correlation between the two is sufficiently high (0.75). A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 ```
 phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
@@ -110,11 +118,11 @@ C.2.1,0.0,0.5683,0.0
 C.2.2,0.0,0.6815,0.0
 ```
 
-The 3 fields that PHLAME will return are: [1] the estimated relative abundance of the clade in the sample, [2] DVb, which represents the estimated divergence of the sample from the MRCA of that clade, and [3] a Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. Note that Probability Score only has informative information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version. The total relative abundances across any set of non-overlapping clades may not add up to 1. This is intended and suggests that the sample has intraspecies diversity that is sufficiently diverged from any of the clades in the reference set.
+The 3 fields that PHLAME will return are: [1] the estimated relative abundance of the clade in the sample, [2] DVb, which represents the estimated divergence of the sample from the MRCA of that clade, and [3] a Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. Note that Probability Score only has information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version. You may notice that the total relative abundances across any set of non-overlapping clades does not add up to 1. This is intended and suggests that the sample may harbor intraspecies diversity that is novel with regards to any of the clades in the reference set.
 
 ### 3. Visualizing classification results
 
-The compressed data file has lots of useful information that can be used to help visualize detection decisions. You can view the output of a data file with the command `phlame plot`; this is generally much more useful when running the bayesian version of the classify step, as you will be able to visualize full posteriors over Divergence and relative abundance. For this, a pre-made data file has been included in `example`
+The compressed data file has lots of useful information that can be used to help visualize detection decisions. You can view the output of a data file with the command `phlame plot`; this is generally much more useful when running the bayesian version of the classify step, as you will be able to visualize full posteriors over each parameter. For this, a pre-made data file has been included in `example`.
 
 ```
 phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo_bayesian.data -o skin_mg_frequencies_plot.pdf
@@ -122,7 +130,4 @@ phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo_bayesian.data -o skin_
 
 ![alt text](example/plot.png)
 
-Each clade will have four relevant plots. From left to right, they are: [1] A histogram of the actual number of reads supporting each clade-specific allele (red), as well as all alleles at the same positions (grey). [2] The posterior probability over the pi parameter (equivalent to DVb) [3] The posterior probability over the lambda (rate) parameter and [4] The posterior probability density opver the relative abundance of the clade in the same. In this particular example, The posterior densities all have fairly high spreads because the sequencing depth is low. Visualizing the posterior densities helps us make detection decisions. For example, while clade C.2 is has enough density below our threshold to be detected, very little density is actually centered around pi values of 0. If we wanted to limit our detections to only strains that we think are for sure within the mRCA of C.2, we might reject this detection (for example, via the --hpd threshold in `phlame classify`)
-
-
-
+Each clade will have four relevant plots. From left to right, they are: [1] A histogram of the actual number of reads supporting each clade-specific allele (red), as well as all alleles at the same positions (gray). [2] The posterior probability over the pi parameter (equivalent to DVb) in green, as well as the 95% highest posterior density interval (gray bar). [3] The posterior probability over the lambda (rate) parameter and [4] The posterior probability density opver the relative abundance of the clade in the same. In this particular example, The posterior densities all have fairly high spreads because the sequencing depth is low. Visualizing the posterior densities helps us make detection decisions. For example, while clade C.2 is has enough density below our threshold to be detected, very little density is actually centered around pi values of 0. If we wanted to limit our detections to only strains that we think are for sure within the mRCA of C.2, we might reject this detection (for example, via the --hpd threshold in `phlame classify`)
