@@ -131,16 +131,6 @@ rule bowtie2:
 			"-x {params.refGenome} "
 			"-S {output.samA} 2> {log} "
 
-rule bowtie2qc:
-	input:
-		bowtie2_logs = expand("logs/bowtie2_{sampleID}_ref_{reference}.txt", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
-	output:
-		alignment_stats = "3-bowtie2/alignment_stats.csv",
-	conda:
-		"envs/bowtie2qc.yaml",
-	shell:
-		"python3 {CURRENT_DIR}/scripts/bowtie2qc.py -s {spls} -d {CURRENT_DIR}"
-
 rule sam2bam:
     input:
             samA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sam",
