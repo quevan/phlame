@@ -507,6 +507,8 @@ class countsCSS_NEW:
 
             self.pi = pi_MLE
 
+            self.chain = None
+
 
         # =====================================================================
         #  Gibbs sampling
