@@ -60,7 +60,7 @@ phlame counts -p Cacnes_isolate_aligned.pileup -v Cacnes_isolate_aligned.sorted.
 
 Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already made in `example/counts/`
 ```
-phlame cmt -i counts_files.txt -s 'A039,A441,A443,B089,F109,F189,L363' -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
+phlame cmt -i counts_files.txt -s sample_names.txt -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
 ```
 
 From a candidate mutation table, we can create a phylogeny and a PHLAME database using the commands `phlame tree` and `phlame makedb`, respectively.
