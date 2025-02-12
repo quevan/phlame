@@ -1,3 +1,6 @@
+## [1.0.5] - 2024-02-11
+- Bugfix chain in mle version now gives None
+
 ## [1.0.4] - 2024-02-07
 - Updated snakemakes and README
 
