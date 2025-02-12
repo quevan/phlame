@@ -70,10 +70,10 @@ Using the integrated tree-building step requires RaXML installed.
 conda install raxml
 ```
 
+You can run the integrated `tree` step as follows:
 ```
 phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.txt -o Cacnes.tre
 ```
-
 
 Alternatively, you can use `tree` to create a PHYLIP formatted file, which plugs into many different phylogenetic inference algorithms.
 ```
