@@ -65,7 +65,17 @@ phlame cmt -i counts_files.txt -s sample_names.txt -r Pacnes_C1.fasta -o Cacnes_
 
 From a candidate mutation table, we can create a phylogeny and a PHLAME database using the commands `phlame tree` and `phlame makedb`, respectively.
 
-Using the integrated tree-building step requires RaXML installed. Alternatively, you can use `tree` to create a PHYLIP formatted file, which plugs into many different phylogenetic inference algorithms.
+Using the integrated tree-building step requires RaXML installed.
+```
+conda install raxml
+```
+
+You can run the integrated `tree` step as follows:
+```
+phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.txt -o Cacnes.tre
+```
+
+Alternatively, you can use `tree` to create a PHYLIP formatted file, which plugs into many different phylogenetic inference algorithms.
 ```
 phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.txt
 ```
