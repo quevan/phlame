@@ -68,27 +68,27 @@ if __name__ == '__main__':
 
     # Classify arguments
     classify_op.add_argument('-i', dest='input', type=str, required=True, 
-                          help='Path to input bam file.')
+                          help='Path to input bam file (required).')
     classify_op.add_argument('-c', dest='classifier', type=str, required=True,
-                          help='Path to classifer file.')
+                          help='Path to classifer file (required).')
     classify_op.add_argument('-r', dest='ref', type=str, required=True,
-                            help='Path to reference genome (.fasta).')
+                            help='Path to reference genome (required, fasta format).')
     classify_op.add_argument('-l', dest='level', type=str, default=False, required=False,
                           help='Level specification.')
     classify_op.add_argument('-o', dest='output', type=str, required=True,
-                          help='Path to output frequencies file (.csv)')
+                          help='Path to output frequencies file (required).')
     classify_op.add_argument('-p', dest='outputdata', type=str, default=False, required=False,
-                          help='Path to output data file (.pickle.gz)')
+                          help='Path to output data file (required).')
     classify_op.add_argument('-m', choices=['bayesian', 'mle'], required=True,
-                             help="Inference algorithm to use (default mle).", default="mle")
+                             help="Inference algorithm to use. Defaults to 'mle'", default="mle")
     classify_op.add_argument('--max_pi', type=float, default=0.3, required=False,
-                          help='Maximum pi value to count a lineage as present.')
+                          help='Maximum Divergence to count a lineage as present. Default = 0.3.')
     classify_op.add_argument('--min_snps', type=int, default=10, required=False,
-                          help='Minimum number of present mutations to count a lineage as present.')
+                          help='Minimum number of present mutations to count a lineage as present. Default = 10.')
     classify_op.add_argument('--min_prob', type=float, default=0.5, required=False,
-                          help='Bayesian only: Minimum probability score to count a lineage as present.')
+                          help='Bayesian only: Minimum probability score to count a lineage as present. Default = 0.5.')
     classify_op.add_argument('--min_hpd', type=int, default=0.15, required=False,
-                          help='Bayesian only: Minimum value the highest posterior density interval over divergence must cover to count a lineage as present.')
+                          help='Bayesian only: Minimum value the highest posterior density interval over divergence must cover to count a lineage as present. Default = 0.15.')
     classify_op.add_argument('--seed', type=int, required=False, default=False,
                           help='Set random seed for reproducibility.') 
     classify_op.add_argument('--verbose', required=False,  action='store_true', default=True,
@@ -96,50 +96,50 @@ if __name__ == '__main__':
 
     # Make_classifier arguments
     makedb_op.add_argument('-i', dest='input', type=str, required=True, 
-                          help='Path to input candidate mutation table.')
+                          help='Path to input candidate mutation table (required).')
     makedb_op.add_argument('-t', dest='intree', type=str, required=True,
-                          help='Path to input phylogeny (Newick format).')
+                          help='Path to input phylogeny (required, newick format).')
     
     makedb_op.add_argument('-o', dest='outdb', type=str, required=True,
-                          help='Path to output classifier.')
+                          help='Path to output classifier (required).')
     makedb_op.add_argument('-p', dest='outclades', type=str, required=True,
-                          help='Path to output clades file.')
+                          help='Path to output clades file (required).')
     makedb_op.add_argument('-y', dest='outtree', type=str, required=False, default=None,
                             help='Path to output tree labelled with clade names.')
     
     makedb_op.add_argument('-c', dest='inclades', type=str, required=False, default=False,
-                        help='Manually define clades to be included in the classifier.')
+                        help='Path to optional file (newline-separated) listing clades to be manually included in the classifier.')
 
-    makedb_op.add_argument('--outgroup', type=float, default=False, required=False,
+    makedb_op.add_argument('--outgroup', type=str, default=False, required=False,
                           help='Specify a comma separated list of samples to be considered outgroups.')
-    makedb_op.add_argument('--max_outgroup', type=float, default=False, required=False,
-                          help='Maximum number of outgroup samples a position can be found in (non-N) to be considered.')
+    makedb_op.add_argument('--max_outgroup', type=float, default=0.1, required=False,
+                          help='Maximum percent of outgroup samples a position can be found in (non-N) to be considered. Default=0.1')
 
     makedb_op.add_argument('--min_snps', type=int, default=10, required=False,
-                          help='Minimum number of SNPs to include a candidate clade')
+                          help='Minimum number of SNPs to include a candidate clade. Default = 10.')
     makedb_op.add_argument('--maxn', type=float, default=0.1, required=False,
-                          help='Maximum percentage of Ns for a position to be considered')
+                          help='Maximum percentage of Ns for a position to be considered. Default = 0.1.')
     makedb_op.add_argument('--core', type=float, default=0.9, required=False,
-                          help='Minimum percent of samples a position must be found in (non-N) to be considered.')
+                          help='Minimum percent of samples a position must be found in (non-N) to be considered. Default = 0.9.')
 
 
     makedb_op.add_argument('--min_branchlen', type=float, default=100, required=False,
-                          help='Minimum branch length leading up to a clade.')
+                          help='Minimum branch length leading up to a clade. Default = 100.')
     makedb_op.add_argument('--min_leaves', type=int, default=3, required=False,
-                          help='Minimum number of samples in a clade.')
+                          help='Minimum number of samples in a clade. Default = 3.')
     makedb_op.add_argument('--min_support', type=float, default=0.75, required=False,
-                          help='Minimum bootstrap support for a clade.')
+                          help='Minimum bootstrap support for a clade. Default = 0.75.')
     
     makedb_op.add_argument('--minAF', type=float, default=0.75, required=False,
-                          help='Minimum allele frequency to make a base call.')
+                          help='Minimum allele frequency to make a base call. Default = 0.75.')
     makedb_op.add_argument('--min_strand_cov', type=int, default=2, required=False,
-                            help='Minimum per-strand coverage across a position to make a base call.')
+                            help='Minimum per-strand coverage across a position to make a base call. Default = 2.')
     makedb_op.add_argument('--qual', type=int, default=-30, required=False,
-                            help='Minimum MAPQ score to make a base call.')
+                            help='Minimum MAPQ score to make a base call. Default = -30.')
     makedb_op.add_argument('--max_frac_ambiguous', type=float, default=0.5, required=False,
-                            help='Maximum fraction of ambiguous (N) calls to include a sample.')
+                            help='Maximum fraction of ambiguous (N) calls to include a sample. Default = 0.5.')
     makedb_op.add_argument('--midpoint', required=False,  action='store_true', default=False,
-                            help='Root the input tree at the midpoint.')
+                            help='Root the input tree at the midpoint. Default = False.')
 
     # Tree arguments
     tree_op.add_argument('-i', dest='cmt', type=str, required=False, default=None, 
@@ -181,33 +181,33 @@ if __name__ == '__main__':
 
     # Plot arguments
     plot_op.add_argument('-f', dest='infreq', type=str, required=True,
-                        help='Path to input frequencies file.')
+                        help='Path to input frequencies file (required).')
     plot_op.add_argument('-d', dest='indata', type=str, required=True,
-                        help='Path to input data file.')
+                        help='Path to input data file (required).')
     plot_op.add_argument('-o', dest='output', type=str, required=True,
-                            help='Path to plot of classify output data (.pdf).')
-    plot_op.add_argument('--max_pi', type=float, default=0.35, required=False,
-                        help='Maximum pi value to count a lineage as present.')
+                            help='Path to pdf of informative output plots (required).')
+    plot_op.add_argument('--max_pi', type=float, default=0.3, required=False,
+                        help='Maximum pi value to count a lineage as present. Should be the same as used in classify step. Default = 0.3.')
     plot_op.add_argument('--min_prob', type=float, default=0.5, required=False,
-                        help='Minimum probability score to count a lineage as present.')
+                        help='Minimum probability score to count a lineage as present. Should be the same as used in classify step. Default = 0.5.')
     
 
     # CMT arguments
     cmt_op.add_argument('-i', dest='counts_files', type=str, required=True,
-                        help='Path to file (newline-separated) listing counts files, in same order as sample names.')
+                        help='Path to file (newline-separated) listing counts files, in same order as sample names (required).')
     cmt_op.add_argument('-s', dest='sample_names', type=str, required=True,
-                        help='Path to file (newline-separated) listing sample names.')
+                        help='Path to file (newline-separated) listing sample names (required).')
     cmt_op.add_argument('-r', dest='ref', type=str, required=True,
-                        help='Path to reference genome.')
+                        help='Path to reference genome (required, fasta format).')
     cmt_op.add_argument('-o', dest='out_cmt', type=str, required=True,
-                        help='Path to output CMT file.')
+                        help='Path to output compressedCMT file (required).')
        
     
     # Counts arguments
     counts_op.add_argument('-p', dest='pileup', type=str, required=True,
-                            help='Path to input pileup file.')
+                            help='Path to input pileup file (required).')
     counts_op.add_argument('-v', dest='vcf', type=str, required=True,
-                            help='Path to input VCF file.')
+                            help='Path to input VCF file (required).')
     counts_op.add_argument('-w', dest='variant_vcf', type=str, required=True,
                             help='Path to input variant VCF file.')
     counts_op.add_argument('-r', dest='ref', type=str, required=True,
