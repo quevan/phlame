@@ -22,7 +22,6 @@ fmt={'fontsize':15,
 
 %matplotlib auto
 
-
 #%% Functions
 
 def group_hits_by_family(TP_ls, FP_ls, 
@@ -428,6 +427,8 @@ for freqs in [sepi_phlame_freqs, sepi_strainest_freqs, sepi_strainest_rep_freqs,
 
 #%% Fig 3B: Precision curve (lineages) - how many of the lineages are not isolated from the same individual?
 
+method_ls = [method.replace('GE','GST') for method in  method_ls]
+
 fig4b, ax4b = plt.subplots(2)
 fig4b.set_size_inches(5,6.5)
 
@@ -440,10 +441,10 @@ cacnes_df = group_hits_by_family(cacnes_TP_ls, cacnes_FP_ls,
 sepi_df = group_hits_by_family(sepi_TP_ls, sepi_FP_ls, 
                                sepi_isotable_family, method_ls)
 
-cacnes_df.iloc[::-1].plot(kind='barh', stacked=True, color=['w', 'k','red'], rot=0, alpha=0.8,
+cacnes_df.iloc[::-1].plot(kind='barh', stacked=True, color=['w', 'k','red'], rot=0, alpha=0.7,
         edgecolor='black', width=0.8, ax=ax4b[0], legend=False)
 
-sepi_df.iloc[::-1].plot(kind='barh', stacked=True, color=['w', 'k','red'], rot=0, alpha=0.8,
+sepi_df.iloc[::-1].plot(kind='barh', stacked=True, color=['w', 'k','red'], rot=0, alpha=0.7,
         edgecolor='black', width=0.8, ax=ax4b[1])
 
 ax4b[1].set_xlabel('Total lineage detections\nacross individuals', **fmt)
@@ -454,8 +455,8 @@ ax4b[1].set_title('S. epidermidis', **fmt)
 ax4b[1].legend(fontsize=12, title='Lineage isolated from:')
 fig4b.tight_layout()
 
-# fig4b.savefig('fig4/fig4b.pdf',format='pdf')
-# fig4b.savefig('fig4/fig4b.jpg',format='jpg')
+fig4b.savefig('fig4/fig4b.pdf',format='pdf')
+fig4b.savefig('fig4/fig4b.jpg',format='jpg')
 
 #%% Stats for text
 
@@ -525,8 +526,13 @@ for i, (isotable, to_drop, bool_) in enumerate(zip([cacnes_isotable, sepi_isotab
                                                     manual_lineages_to_drop,
                                                     coverage_bool_ls)):
 
-    isotable_parent = isotable[parent_bool]
-    isotable_child = isotable[~parent_bool][:-2] # -2 is to remove JSB and TCL
+    isotable_parent = isotable[parent_bool][:-1] # -1 is to remove 9AA
+    isotable_child = isotable[~parent_bool][:-3] # -2 is to remove JSB, TCL, 9PA
+
+    print(f"Number of isolates in parent: {min(isotable_parent.sum(1))} - {max(isotable_parent.sum(1))}, " + \
+                                            f"mean={isotable_parent.sum(1).mean():.2f}")
+    print(f"Number of isolates in child: {min(isotable_child.sum(1))} - {max(isotable_child.sum(1))}, " + \
+                                            f"mean={isotable_child.sum(1).mean():.2f}")
     
     lineages_adult_only = isotable_parent.columns[isotable_parent.sum(axis=0) > 0]
     lineages_nochild = isotable_child.columns[isotable_child.sum(axis=0) == 0]
@@ -542,7 +548,7 @@ for i, (isotable, to_drop, bool_) in enumerate(zip([cacnes_isotable, sepi_isotab
 percent_called_cacnes = np.sum(cacnes_frequencies, 1)
 percent_called_sepi = np.sum(sepi_frequencies, 1)
 
-# Get correlation coefficients for C. acnes and S. epidermidis
+#%% Get correlation coefficients for C. acnes and S. epidermidis
 from scipy.stats import pearsonr
 
 cacnes_coverage_bool = (cacnes_coverage[parent_bool][0] > 1).values
@@ -553,7 +559,7 @@ correlation_cacnes = pearsonr(percent_called_cacnes[cacnes_coverage_bool][cacnes
 sepi_coverage_bool = (sepi_coverage[parent_bool][0] > 1).values
 sepi_isna_bool = ~pd.isna(novel_isolates_df['S. epidermidis'][sepi_coverage_bool]).values
 correlation_sepi = pearsonr(percent_called_sepi[sepi_coverage_bool][sepi_isna_bool],
-                                novel_isolates_df['S. epidermidis'][sepi_coverage_bool][sepi_isna_bool])
+                            pd.to_numeric(novel_isolates_df['S. epidermidis'][sepi_coverage_bool][sepi_isna_bool]))
 
 fig4c, axs4c = plt.subplots()
 fig4c.set_size_inches(3.5,5)
@@ -576,9 +582,9 @@ axs4c.legend(fontsize=12, loc='upper right', bbox_to_anchor=(1,1.5))
 axs4c.tick_params(axis='both', labelsize=12)
 fig4c.tight_layout()
 
-fig4c.savefig('fig4/fig4c.pdf',format='pdf')
+# fig4c.savefig('fig4/fig4c.pdf',format='pdf')
 
-
+#%% For tami
 from colorcet.plotting import swatch, swatches, candy_buttons
 import holoviews as hv
 from matplotlib.cm import get_cmap
@@ -712,3 +718,5 @@ fig4a.tight_layout(w_pad=1.5)
 # coverage = helper.parse_coverage(samples_1AA,
 #                                  path_to_counts,
 #                                  'Pacnes_C1')
+
+# %%

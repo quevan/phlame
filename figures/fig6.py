@@ -80,23 +80,6 @@ def read_alignment_stats_multi(alignment_stats_ls,
     return alignment_stats_df
 
 
-def parse_coverage_multi(sample_names,
-                         counts_dir,
-                         reference_genome_ls,
-                         reference_genome_names_ls):
-
-    cov_cat = pd.DataFrame()
-    
-    for refgenome,refgenome_name in zip(reference_genome_ls,reference_genome_names_ls):
-
-        cov_df = helper.parse_coverage(sample_names, counts_dir, refgenome)
-
-        cov_df.columns = [refgenome_name]
-
-        cov_cat = pd.concat((cov_cat, cov_df), axis=1)
-
-    return cov_cat
-
 def read_bracken_frequencies(bracken_dir, sample_names):
 
     bracken_frequencies_df = pd.DataFrame()
@@ -725,7 +708,6 @@ for i, (clade, name) in enumerate(zip(['Gvag.GS1','Gvag.GS2','Gpio.GS3','Gpio.GS
                 df_melt = pd.concat([df_melt, pd.DataFrame({'MAP pi':pis_,
                                                             'Category':[category]*len(pis_)})])
 
-
     # p value kruskal wallis
     _, pval = scipy.stats.kruskal(*[df_melt['MAP pi'][df_melt['Category'] == category].values for category in pjs])
 
@@ -923,174 +905,127 @@ fig.tight_layout()
 
 #%% Benchmarking performance of Gardnerella classifier (simulated data)
 
-# os.chdir('/Users/evanqu/Dropbox (MIT)/Lieberman Lab/Personal lab notebooks/Evan/1-Projects/phlame_project/results/2024_02_Vaginal_gardnerella/benchmarking')
+os.chdir('/Users/evanqu/Dropbox (MIT)/Lieberman Lab/Personal lab notebooks/Evan/1-Projects/phlame_project/results/2024_02_Vaginal_gardnerella/benchmarking')
 
-# samples_csv_file = 'benchmark_samples.csv'
-# samples_csv = pd.read_csv(samples_csv_file)
-# sample_names = samples_csv['Sample']
+samples_csv_file = 'benchmark_samples.csv'
+samples_csv = pd.read_csv(samples_csv_file)
+sample_names = samples_csv['Sample']
 
-# counts_dir = '5-counts_benchmark'
-# phlame_out_dir = '6-frequencies_benchmark'
+phlame_out_dir = '6-frequencies_outgroup'
 
-# Gvag_refgenome = 'Gvaginalis_FDAARGOS_568'
-# Gpio_refgenome = 'Gpiotii_ASM339758'
-# Gleo_refgenome = 'Gleopoldii_6420B'
-# Ggre_refgenome = 'Ggreenwoodii_ASM26363'
+Gvag_refgenome = 'Gvaginalis_FDAARGOS_568'
+Gpio_refgenome = 'Gpiotii_ASM339758'
+Gleo_refgenome = 'Gleopoldii_6420B'
+Ggre_refgenome = 'Ggreenwoodii_ASM26363'
 
-# phlame_frequencies = read_sample_frequencies_multi(sample_names[:-1],
-#                                                    [phlame_out_dir,phlame_out_dir,phlame_out_dir,phlame_out_dir],
-#                                                    [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
-#                                                    ['Gvag','Gpio','Gleo','Ggre'])
-# clade_names_all = phlame_frequencies.columns
+phlame_frequencies = read_sample_frequencies_multi(sample_names,
+                                                   [phlame_out_dir,phlame_out_dir,phlame_out_dir,phlame_out_dir],
+                                                   [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
+                                                   ['Gvag','Gpio','Gleo','Ggre'])
+clade_names_all = phlame_frequencies.columns
 
-# phlame_frequencies[phlame_frequencies < 0.01] = 0
+phlame_frequencies[phlame_frequencies < 0.01] = 0
 
-# gvag_bool = [col.startswith('Gvag') for col in phlame_frequencies.columns]
-# gpio_bool = [col.startswith('Gpio') for col in phlame_frequencies.columns]
-# gleo_bool = [col.startswith('Gleo') for col in phlame_frequencies.columns]
-# ggre_bool = [col.startswith('Ggre') for col in phlame_frequencies.columns]
+gvag_bool = [col.startswith('Gvag') for col in phlame_frequencies.columns]
+gpio_bool = [col.startswith('Gpio') for col in phlame_frequencies.columns]
+gleo_bool = [col.startswith('Gleo') for col in phlame_frequencies.columns]
+ggre_bool = [col.startswith('Ggre') for col in phlame_frequencies.columns]
 
-# # # Normalize frequencies that sum above 1 to 1
-# norm_to_1 = phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-
-
-# coverage = parse_coverage_multi(sample_names[:-1],
-#                                 counts_dir,
-#                                 [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
-#                                 ['Gvag','Gpio','Gleo','Ggre'])
-
-# # Normalize frequencies across different reference genomes
-# phlame_frequencies_norm = phlame_frequencies.copy()
-# coverage_norm = coverage.div(coverage.sum(1),0)
-# for name, bool_ in zip(['Gvag','Gpio','Gleo','Ggre'],
-#                        [gvag_bool,gpio_bool,gleo_bool,ggre_bool]):
-#     phlame_frequencies_norm.loc[:,bool_] = phlame_frequencies_norm.loc[:,bool_].mul(coverage_norm[name], axis=0)
-
-# #%% Read in true frequencies
-
-# true_abundances_file = 'true_community_abundances.csv'
-# true_abundances = pd.read_csv(true_abundances_file, header=0, index_col=0).T
-
-# isolate2lineage_file = 'Gardnerella_iso2_phylo.txt'
-# iso2lineage_dct = {}
-# with open(isolate2lineage_file,'r') as f:
-#     for line in f:
-#         lineinfo = line.rstrip('\n').split('\t')
-#         iso2lineage_dct[lineinfo[0]] = lineinfo[1]
+# # Normalize frequencies that sum above 1 to 1
+norm_to_1 = phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)]
+phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
+norm_to_1 = phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)]
+phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
+norm_to_1 = phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)]
+phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
+norm_to_1 = phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)]
+phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
 
 
-# true_abundances_phylo = helper.merge_frequencies_by_lineage(true_abundances,
-#                                                              iso2lineage_dct)
+#%% Read in coverage
 
-# true_abundances_phylo.sort_index(inplace=True)
+def parse_coverage_multi(sample_names,
+                         phlame_out_dir,
+                         reference_genome_ls,
+                         reference_genome_names_ls):
 
-# true_abundances_phylo = true_abundances_phylo.iloc[:,:-1]
-# # Normalize to 1
-# true_abundances_phylo = true_abundances_phylo.div(true_abundances_phylo.sum(1),0)
-# true_abundances_phylo['GS8'] = 0
+    cov_cat = pd.DataFrame()
+    
+    for refgenome, refgenome_name in zip(reference_genome_ls,reference_genome_names_ls):
 
-# true_abundances_phylo = true_abundances_phylo.reindex(sorted(true_abundances_phylo.columns), axis=1)
-
-# assert (true_abundances_phylo.index == phlame_frequencies_norm.index).all()
-
-# #%% Plot true vs. estimated abundances
-
-# fig, axs = plt.subplots()
-
-# colors = ['red','lime','tab:orange','teal','dimgrey','purple','blue','black']
-# for idx_, column in enumerate(true_abundances_phylo.columns):
-#     if  column == 'GS8':
-#         continue
-#     axs.scatter(true_abundances_phylo[column], phlame_frequencies_norm.iloc[:,idx_],
-#                 label=column, alpha=.5, color=colors[idx_])
-#     axs.set_xlabel('True abundance')
-#     axs.set_ylabel('Estimated abundance')
-
-# axs.plot([0,1],[0,1], color='k', linestyle='--')
-# axs.legend()
+        cov_ls = []
+        for sample_name in sample_names:
+            data_file = f'{phlame_out_dir}/{sample_name}_ref_{refgenome}_fitinfo.data'
+            data = helper.FrequenciesData(data_file)
+            cov_ls.append(data.coverage)
 
 
-# #%% Laura samples
+        cov_df = pd.DataFrame(cov_ls)
+        cov_df.columns = [refgenome_name]
 
-# os.chdir('/Users/evanqu/Dropbox (MIT)/Lieberman Lab/Personal lab notebooks/Evan/for_people/for_laura/leg_gardnerella')
+        cov_cat = pd.concat((cov_cat, cov_df), axis=1)
+    
+    cov_cat.index = sample_names
+    return cov_cat
 
-# samples_csv_file = 'samples_vaginalis.csv'
-# samples_csv = pd.read_csv(samples_csv_file)
-# sample_names = samples_csv['Sample']
+coverage = parse_coverage_multi(sample_names,
+                                phlame_out_dir,
+                                [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
+                                ['Gvag','Gpio','Gleo','Ggre'])
 
-# counts_dir = '5-counts'
-# phlame_out_dir = '6-frequencies'
+# Normalize frequencies across different reference genomes
+phlame_frequencies_norm = phlame_frequencies.copy()
+coverage_norm = coverage.div(coverage.sum(1),0)
+for name, bool_ in zip(['Gvag','Gpio','Gleo','Ggre'],
+                       [gvag_bool,gpio_bool,gleo_bool,ggre_bool]):
+    phlame_frequencies_norm.loc[:,bool_] = phlame_frequencies_norm.loc[:,bool_].mul(coverage_norm[name], axis=0)
 
-# Gvag_refgenome = 'Gvaginalis_FDAARGOS_568'
-# Gpio_refgenome = 'Gpiotii_ASM339758'
-# Gleo_refgenome = 'Gleopoldii_6420B'
-# Ggre_refgenome = 'Ggreenwoodii_ASM26363'
+#%% Read in true frequencies
 
-# phlame_frequencies = read_sample_frequencies_multi(sample_names,
-#                                                    [phlame_out_dir,phlame_out_dir,phlame_out_dir,phlame_out_dir],
-#                                                    [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
-#                                                    ['Gvag','Gpio','Gleo','Ggre'])
-# clade_names_all = phlame_frequencies.columns
+true_abundances_file = 'true_community_abundances.csv'
+true_abundances = pd.read_csv(true_abundances_file, header=0, index_col=0).T
 
-# phlame_frequencies[phlame_frequencies < 0.01] = 0
-
-# gvag_bool = [col.startswith('Gvag') for col in phlame_frequencies.columns]
-# gpio_bool = [col.startswith('Gpio') for col in phlame_frequencies.columns]
-# gleo_bool = [col.startswith('Gleo') for col in phlame_frequencies.columns]
-# ggre_bool = [col.startswith('Ggre') for col in phlame_frequencies.columns]
-
-# # # Normalize frequencies that sum above 1 to 1
-# norm_to_1 = phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 0:3].loc[(phlame_frequencies.iloc[:, 0:3].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 2:4].loc[(phlame_frequencies.iloc[:, 2:4].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 4:6].loc[(phlame_frequencies.iloc[:, 4:6].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
-# norm_to_1 = phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)]
-# phlame_frequencies.iloc[:, 6:8].loc[(phlame_frequencies.iloc[:, 6:8].sum(axis=1) > 1)] = norm_to_1.div(norm_to_1.sum(axis=1), axis=0)
+isolate2lineage_file = 'Gardnerella_metadata_short.txt'
+iso2lineage_dct = {}
+with open(isolate2lineage_file,'r') as f:
+    for line in f:
+        lineinfo = line.rstrip('\n').split('\t')
+        iso2lineage_dct[lineinfo[0]] = lineinfo[1]
 
 
-# coverage = parse_coverage_multi(sample_names,
-#                                 counts_dir,
-#                                 [Gvag_refgenome,Gpio_refgenome,Gleo_refgenome,Ggre_refgenome],
-#                                 ['Gvag','Gpio','Gleo','Ggre'])
+true_abundances_phylo = helper.merge_frequencies_by_lineage(true_abundances,
+                                                             iso2lineage_dct)
 
-# # Normalize frequencies across different reference genomes
-# phlame_frequencies_norm = phlame_frequencies.copy()
-# coverage_norm = coverage.div(coverage.sum(1),0)
-# for name, bool_ in zip(['Gvag','Gpio','Gleo','Ggre'],
-#                        [gvag_bool,gpio_bool,gleo_bool,ggre_bool]):
-#     phlame_frequencies_norm.loc[:,bool_] = phlame_frequencies_norm.loc[:,bool_].mul(coverage_norm[name], axis=0)
+true_abundances_phylo = true_abundances_phylo.reindex(sample_names)
+true_abundances_phylo = true_abundances_phylo.reindex(sample_names)
 
-# phlame_frequencies_norm.fillna(0, inplace=True)
-# #%% 
+# Normalize to 1
+true_abundances_phylo = true_abundances_phylo.div(true_abundances_phylo.sum(1),0)
 
-# fig, axs = plt.subplots()
-# fig.set_size_inches(5,5)
+true_abundances_phylo = true_abundances_phylo.reindex(sorted(true_abundances_phylo.columns), axis=1)
 
-# perc_called = phlame_frequencies_norm.sum(1)
+assert (true_abundances_phylo.index == phlame_frequencies_norm.index).all()
 
-# axs.scatter(coverage.sum(1), perc_called, color='k', alpha=.6)
-# axs.set_xlabel('Sum non-overlapping Gardnerella coverage \n(across 4 reference genomes)', **fmt)
-# axs.set_ylabel('Percent called', **fmt)
-# axs.xaxis.set_tick_params(labelsize=12)
-# axs.yaxis.set_tick_params(labelsize=12)
+#%% Plot true vs. estimated abundances
 
-# axs.set_ylim(0,1)
-# axs.set_xscale('log')
+os.chdir('/Users/evanqu/Dropbox (MIT)/Lieberman Lab/Personal lab notebooks/Evan/1-Projects/phlame_project/manuscript/figures')
 
-# axs.axvline(1, color='k', alpha=.5)
+fig, axs = plt.subplots()
+fig.set_size_inches(5,5)
 
-# fig.tight_layout()
+clades_to_compare = ['GS1','GS2','GS3','GS4','GS5','GS6']
+colors = ['red','lime','tab:orange','teal','dimgrey','purple','blue','black']
+for idx_, column in enumerate(clades_to_compare):
+    if  column == 'GS8':
+        continue
+    axs.scatter(true_abundances_phylo[column], phlame_frequencies_norm.iloc[:,idx_],
+                label=column, alpha=.5, color='k', s=5)
 
+axs.plot([0,1],[0,1], color='k', linestyle='--')
+axs.legend()
+axs.set_title('With outgroup', fontname='Arial', fontsize=15)
+axs.set_xlabel('True abundance', **fmt)
+axs.set_ylabel('Estimated abundance', **fmt)
+axs.tick_params(axis='both', which='major', labelsize=12)
 
-# phlame_frequencies_norm.to_csv('phlame_frequencies_gardnerella.csv')
-
-#%% Supplemental: Overdispersion of all the vaginal samples (from counts)
+fig.savefig('supplemental/figS20A1.pdf', dpi=300, format='pdf')

@@ -89,6 +89,8 @@ class CountsMat():
         self.counts = counts
         self.pos = pos
 
+        self.coverage = np.mean(np.sum(counts, axis=1))
+
     def main(self):
         
         print(f"Reading pileup file: {self.path_to_pileup}")
@@ -97,6 +99,8 @@ class CountsMat():
         
         self.counts = counts
         self.pos = pos
+
+        self.coverage = np.mean(np.sum(counts, axis=1))
 
     def pileup2counts(self,
                       input_pileup,
