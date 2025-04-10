@@ -1,3 +1,9 @@
+## [1.0.7] - 2024-04-10
+- Added mean coverage information into classify output
+
+## [1.0.6] - 2024-03-28
+- Fixed bug with specifying outgroups in makedb
+
 ## [1.0.5] - 2024-02-11
 - Bugfix chain in mle version now gives None
 

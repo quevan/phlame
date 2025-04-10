@@ -74,7 +74,7 @@ rule cutadapt:
 	log:
 		log="logs/cutadapt_{sampleID}.txt",
 	conda:
-		"envs/cutadapt.yaml"
+		"phlame_snakemake",
 	shell:
 		"cutadapt -a CTGTCTCTTAT --cores=8 "
 			"-o {output.fq1o} {input.fq1} 1> {log};"
@@ -92,7 +92,7 @@ rule sickle:
 	log:
 		log="logs/sickle2050_{sampleID}.txt",
 	conda:
-		"envs/sickle-trim.yaml"
+		"phlame_snakemake",
 	shell:
 		"sickle pe -g -q 15 -l 50 -x -n -t sanger "
 			"-f {input.fq1o} -r {input.fq2o} "
@@ -107,7 +107,7 @@ rule refGenome_index:
 	output:
 		bowtie2idx="data/references/{reference}/genome_bowtie2.1.bt2"
 	conda:
-		"envs/bowtie2.yaml"
+		"phlame_snakemake",
 	shell:
 		"bowtie2-build -q {input.fasta} {params} "
 
@@ -123,7 +123,7 @@ rule bowtie2:
 	log:
 		log="logs/bowtie2_{sampleID}_ref_{reference}.txt",
 	conda:
-		"envs/bowtie2.yaml"
+		"phlame_snakemake",
 	shell:
 		# 8 threads coded into json
 		"bowtie2 --threads 8 -X 2000 --no-mixed --dovetail "
@@ -133,37 +133,37 @@ rule bowtie2:
 
 rule sam2bam:
     input:
-            samA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sam",
+        samA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sam",
     params:
-            # fqU1="3-bowtie2/{sampleID}_ref_{reference}_unaligned.1.fastq",
-            # fqU2="3-bowtie2/{sampleID}_ref_{reference}_unaligned.2.fastq",
-            bamDup="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.bam",
-            bamDupMate="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.mates.bam",
-            bamDupMateSort="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.sorted.mates.bam",
-            DupStats="3-bowtie2/{sampleID}_ref_{reference}_markdup_stats.txt",
+        # fqU1="3-bowtie2/{sampleID}_ref_{reference}_unaligned.1.fastq",
+        # fqU2="3-bowtie2/{sampleID}_ref_{reference}_unaligned.2.fastq",
+        bamDup="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.bam",
+        bamDupMate="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.mates.bam",
+        bamDupMateSort="3-bowtie2/{sampleID}_ref_{reference}_aligned_dups.sorted.mates.bam",
+        DupStats="3-bowtie2/{sampleID}_ref_{reference}_markdup_stats.txt",
     output:
-            bamA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam",
+        bamA="3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam",
     conda:
-            "envs/samtools115.yaml"
+        "phlame_snakemake",
     shell:
-            # 8 threads coded into json
-            " samtools view -bS {input.samA} | samtools sort -n - -o {params.bamDup} ;"
-            " samtools fixmate -m {params.bamDup} {params.bamDupMate} ;"
-            " samtools sort -o {params.bamDupMateSort} {params.bamDupMate} ;"
-            " samtools markdup -r -s -f {params.DupStats} -d 100 -m s {params.bamDupMateSort} {output.bamA} ;"
-            " samtools index {output.bamA} ;"
-            # " bgzip -f {params.fqU1}; bgzip -f {params.fqU2} ;"
-            " rm {input.samA} ;"
-            " rm {params.bamDup} {params.bamDupMate} {params.bamDupMateSort} ;"
+        # 8 threads coded into json
+        " samtools view -bS {input.samA} | samtools sort -n - -o {params.bamDup} ;"
+        " samtools fixmate -m {params.bamDup} {params.bamDupMate} ;"
+        " samtools sort -o {params.bamDupMateSort} {params.bamDupMate} ;"
+        " samtools markdup -r -s -f {params.DupStats} -d 100 -m s {params.bamDupMateSort} {output.bamA} ;"
+        " samtools index {output.bamA} ;"
+        # " bgzip -f {params.fqU1}; bgzip -f {params.fqU2} ;"
+        " rm {input.samA} ;"
+        " rm {params.bamDup} {params.bamDupMate} {params.bamDupMateSort} ;"
 
 rule classify:
 	input:
 		bam = "3-bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam",
 	params:
-		cfr = "Gardnerella_classifiers/Gvaginalis_HKY85.classifier",
-		refGenome="data/references/{reference}/genome.fasta"
+		cfr = CLASSIFIER_ls[0],
+		refGenome=REFGENOME_DIR[0] + "/{reference}/genome.fasta"
 	conda:
-		"envs/phlame.yaml"
+		"phlame_snakemake",
 	output:
 		frequencies="4-frequencies/{sampleID}_ref_{reference}_frequencies.csv",
 		data="4-frequencies/{sampleID}_ref_{reference}_fitinfo.data",
@@ -173,7 +173,7 @@ rule classify:
 			"-i {input.bam} "
 			"-c {params.cfr} "
 			"-r {params.refGenome} "
-			"-m mle "
+			"-m bayesian "
 			"-o {output.frequencies} "
 			"-p {output.data} "
 			"--max_pi 0.35 "
@@ -187,7 +187,7 @@ rule plot:
 	params:
 		refGenome="data/references/{reference}/genome.fasta"
 	conda:
-		"envs/phlame.yaml"
+		"phlame_snakemake",
 	output:
 		plot="4-frequencies/{sampleID}_ref_{reference}_plot.pdf",
 	shell:

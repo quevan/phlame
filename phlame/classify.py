@@ -397,7 +397,8 @@ class Classify:
                          'chain':save_chain,
                          'prob':save_prob,
                          'hpd':save_hpd,
-                         'mode':self.mode}
+                         'mode':self.mode,
+                         'coverage':self.countsmat.coverage}
     
     def save_frequencies(self):
         '''

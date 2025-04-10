@@ -39,7 +39,7 @@ class MakeDB():
                  min_strand_cov_for_call=2,
                  max_qual_for_call=-30,
                  max_frac_ambiguous=0.5,
-                 max_outgroup=False,
+                 max_outgroup=0.1,
                  midpoint_root=False
                  ):
 
@@ -181,7 +181,7 @@ class MakeDB():
                                  >= self.max_outgroup )
 
             candidate_css[max_outgroup_bool[is_core_genome]] = 0
-            print(f"Removed {np.count_nonzero(max_outgroup_bool[is_core_genome])}/{len(candidate_css)} positions present >{self.max_outgroup*100}% of outgroup genomes")
+            print(f"Removed {np.count_nonzero(max_outgroup_bool[is_core_genome])}/{len(candidate_css)} positions in present >{self.max_outgroup*100}% of outgroup genomes")
 
         # =========================================================================
         #  Remove clades without enough csSNPs

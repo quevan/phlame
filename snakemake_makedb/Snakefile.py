@@ -1,5 +1,5 @@
 ####################################################
-# PHLAME Snakefile (Make DB)
+# PHLAME Snakefile (MakeDB)
 ####################################################
 
 
@@ -10,6 +10,7 @@
 import sys
 import os
 
+##########################################################################################
 # Global variables: In theory do not need to be changed
 
 CURRENT_DIRECTORY = os.getcwd()
@@ -18,29 +19,27 @@ SCRIPTS_DIRECTORY = config["myscripts_directory"]
 sys.path.insert(0, SCRIPTS_DIRECTORY)
 spls = config["sample_table"]
 
-from ss_caller_module import *
-from itertools import compress
-
-spls = config["sample_table"]
+from snakemake_functions import *
+# from itertools import compress
 
 [PATH_ls, SAMPLE_ls, FILENAME_ls, REF_Genome_ls, OUTGROUP_ls] = read_samples_CSV_classifier(spls)
 # Write sample_info.csv for each sample
 split_samplesCSV_classifier(PATH_ls, SAMPLE_ls, FILENAME_ls, REF_Genome_ls, OUTGROUP_ls)
 
-#require the same reference genome for all samples
-# assert len(set(REF_Genome_ls))
+# Require the same reference genome for all samples
+assert len(set(REF_Genome_ls))==1
 
-###########
-# SNAKEMAKE
-###########
+##########################################################################################
 
 rule all:
 	input:
 		# # Only data links # #
 		expand("data/{sampleID}/R1.fq.gz",sampleID=SAMPLE_ls),
 		expand("data/{sampleID}/R2.fq.gz",sampleID=SAMPLE_ls),
-		# # Through mapping steps # #
-		expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=REF_Genome_ls)
+		# # Through alignment steps # #
+		expand("1-Mapping/bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
+		# # Candidate mutation table # #
+		"2-Case/candidate_mutation_table.pickle.gz",
 		
 
 rule make_data_links:
@@ -145,16 +144,6 @@ rule bowtie2:
 			"-1 {input.fq1} -2 {input.fq2} "
 			"-S {output.samA} 2> {log} ;"
 
-rule bowtie2qc:
-	input:
-		bowtie2_logs = expand("logs/bowtie2_{sampleID}_ref_{reference}.txt", sampleID=SAMPLE_ls, reference=set(REF_Genome_ls)),
-	output:
-		alignment_stats = "1-Mapping/bowtie2/alignment_stats.csv",
-	conda:
-		"envs/bowtie2qc.yaml",
-	shell:
-		"python3 {SCRIPTS_DIRECTORY}/bowtie2qc.py -s {spls} -d {CURRENT_DIRECTORY} ;"
-
 rule sam2bam:
 	input:
 		samA=rules.bowtie2.output.samA,
@@ -191,7 +180,7 @@ rule mpileup2vcf:
 		vcf="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
 		vcf_variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
 	params:
-		vcf_tmp="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.gz",
+		vcf_tmp="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.vcf.tmp",
 	benchmark:
 		"benchmarks/rule_mpileup2vcf_{sampleID}_{reference}.benchmark",
 	conda:
@@ -199,12 +188,12 @@ rule mpileup2vcf:
 	shadow: 
 		"minimal", # avoids leaving leftover temp files esp if job aborted
 	shell:
-		" samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bamA} > {output.pileup} ;" 
-		" samtools mpileup -q30 -t SP -d3000 -vf {input.ref} {input.bamA} > {params.vcf_tmp} ;"
-		" bcftools call -c -Oz -o {output.vcf} {params.vcf_tmp} ;"
-		" bcftools view -Oz -v snps -q .75 {output.vcf} > {output.vcf_variants} ;"
-		" tabix -p vcf {output.vcf_variants} ;"
-		" rm {params.vcf_tmp} ;"
+		" samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bamA} > {output.pileup} "
+		" bcftools mpileup -q30 -t SP -d3000 -f {input.ref} {input.bamA} > {params.vcf_tmp} "
+		" bcftools call -c -Oz -o {output.vcf} {params.vcf_tmp} --ploidy 1 "
+		" bcftools view -Oz -v snps -q .75 {output.vcf} > {output.vcf_variants} "
+		" tabix -p vcf {output.vcf_variants} "
+		" rm {params.vcf_tmp} "
 
 rule counts:
 	input:
@@ -220,14 +209,29 @@ rule counts:
 	shell:
 		"phlame counts -p {input.pileup} -v {input.vcf} -w {input.vcf_variants} -r {params.refGenome} -o {output.counts}"
 
-
+rule candidate_mutation_table_prep:
+	input:
+		counts=expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
+	output:
+		counts_files="2-Case/counts_files.txt",
+		sample_names="2-Case/sample_names.txt",
+	run:
+		with open(output.counts_files) as f:
+			for c in input.counts:
+				f.write(c+'\n')
+		with open(output.sample_names) as f:
+			for s in SAMPLE_ls:
+				f.write(s+'\n')
+			
 rule candidate_mutation_table:
 	input:
-		expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=REF_Genome_ls)
+		counts_files="2-Case/counts_files.txt",
+		sample_names="2-Case/sample_names.txt",
+		ref=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
 	output:
 		cmt="2-Case/candidate_mutation_table.pickle.gz",
 	conda:
 		"envs/phlame.yaml"
 	shell:
-		"phlame cmt -i counts_files.txt -s sample_names.txt -r Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz"
+		"phlame cmt -i counts_files.txt -s sample_names.txt -r {input.ref} -o {output.cmt}"
 		
