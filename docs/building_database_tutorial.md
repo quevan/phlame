@@ -73,7 +73,7 @@ $ phlame counts -i Cacnes_PMH7.bam -r reference_genome/Pacnes_C1.fasta -o Cacnes
 
 Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already available in `example/counts/`.
 
-You can create a candidate mutation table by specifying the counts files you want aggregated and their corresponding sample names in newline-delimited files. The number and order of sample names should match the number and order of the counts files. You can check the [manual](docs/manual.md) or the help option (`phlame cmt -h`) for more options.
+You can create a candidate mutation table by specifying the counts files you want aggregated and their corresponding sample names in newline-delimited files. The number and order of sample names should match the number and order of the counts files. You can check the [manual](manual.md) or the help option (`phlame cmt -h`) for more options.
 
 ```
 $ phlame cmt -i counts_files.txt -s sample_names.txt -r reference_genome/Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
@@ -103,7 +103,7 @@ We recommend visualizing your tree (for example, using [FigTree](https://github.
 
 Our rooted phylogeny in `example/` looks like this:
 
-![alt text](docs/tree.png)
+![alt text](tree.png)
 
 At a quick glance, it looks like there are 3 distinct clades in our phylogeny, separated by a minimum branch length of ~623 SNVs. By default, PHLAME will rescale branch lengths into absolute numbers of SNVs when the correlation between the two is sufficiently high (>0.75). 
 
@@ -111,7 +111,7 @@ A key parameter to give to `makedb` is `--min_branchlen`, which defines the mini
 
 ## 4. Making a PHLAME database
 
-Now that we have both our candidate mutation table and our tree, we can run the `makedb` step, which will detect candidate clades in our phylogeny and their corresponding clade-specific mutations. Construction of the actual PHLAME database is done using the `makedb` command. To see the full list of options, check the [manual](docs/manual.md) or the help option (`phlame makedb -h`). 
+Now that we have both our candidate mutation table and our tree, we can run the `makedb` step, which will detect candidate clades in our phylogeny and their corresponding clade-specific mutations. Construction of the actual PHLAME database is done using the `makedb` command. To see the full list of options, check the [manual](manual.md) or the help option (`phlame makedb -h`). 
 
 The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 
