@@ -29,7 +29,7 @@ There are several options and parameters that can be set when running `phlame cl
 *   `-m`, which specifies whether PHLAME will run a maximum likelihood or Bayesian algorithm. The Bayesian algorithm takes longer to run but offers more information (see 3. Visualizing classification results). 
 *   `--max-pi`, which defines the divergence limit past which strains in a sample will be considered too distant to be a member of the same clade (the default for this threshold is `0.35`).
 
-To see the full list of options, check the [manual](docs/manual.md) or the help option (`phlame makedb -h`). 
+To see the full list of options, check the [manual](manual.md) or the help option (`phlame makedb -h`). 
 
 
 We can run `phlame classify` using default parameters as follows:
@@ -49,7 +49,7 @@ C.2.2,0.0,0.6815,0.0
 
 The 3 fields that PHLAME will return are: 
 *   Relative abundance: the estimated relative abundance of the clade in the sample
-*   DVb, which represents the estimated divergence of the sample from the MRCA of that clade. Go [here](docs/xxx.md) for a conceptual introduction to divergence.
+*   DVb, which represents the estimated divergence of the sample from the MRCA of that clade. Go [here](conceptual_intro.md) for a conceptual introduction to divergence.
 *   Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. The Probability Score only has information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version. 
 
 You may notice that the total relative abundances across any set of non-overlapping clades does not add up to 1. This is intended and suggests that the sample may harbor intraspecies diversity that is novel with regards to any of the clades in the reference set.

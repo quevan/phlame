@@ -8,7 +8,7 @@ The compressed data file returned by `phlame classify` has useful information th
 phlame plot -f skin_mg_frequencies.csv -d skin_mg_fitinfo_bayesian.data -o skin_mg_frequencies_plot.pdf
 ```
 
-![alt text](example/plot.png)
+![alt text](plot.png)
 
 Each clade will have four relevant plots. From left to right, they are: 
 *   [1] A histogram of the actual number of reads supporting each clade-specific allele (red), as well as all alleles at the same positions (gray). 
@@ -23,7 +23,7 @@ In this particular example, The posterior densities all have fairly high spreads
 
 By default, PHLAME reports results for every clade in the phylogeny simultaneously. In order to generate downstream analyses like taxonomic bar plots and ordination plots, you need to select a set of non-overlapping clades (a level) to analyze results at.
 
-![alt text](docs/profile.png)
+![alt text](profile.png)
 
 If you already know what phylogenetic level you are interested in, you can ask PHLAME to classify only at those clades using the `-l` parameter in `phlame classify`. You can specify clades as either a string list of clade names or a clade_IDs file.
 
@@ -39,4 +39,4 @@ Note that total inferred frequencies at a specific phylogenetic level may sum to
 
 One useful way to analyze PHLAME results is using a coverage versus percent called plot. In this plot, the total inferred frequency of a sample at a specific phylogenetic level is plotted against the mean coverage of that sample. As coverage decreases, PHLAME becomes less confident about individual calls and therefore assigns less of the sample. On the other hand, samples with high coverage that still have a lower percent assigned likely harbor uncharacterized or novel clades.
 
-![alt text](docs/coverage.png)
+![alt text](coverage.png)
