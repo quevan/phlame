@@ -119,7 +119,7 @@ The phylogeny should be rooted in some way before inputting into the `makedb` st
 $ phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
 
-The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. In addition, the number of clade-specific mutations found for each clade are printed to stdout:
+The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade (`_cladeIDs.txt`). In addition, the number of clade-specific mutations found for each clade are printed to stdout:
 ```
 Reading in files...
 Number of core positions: 16280/17491
@@ -131,4 +131,11 @@ Clade C.1.1: 844 csSNPs found
 Clade C.2: 3956 csSNPs found
 Clade C.2.1: 1338 csSNPs found
 Clade C.2.2: 3526 csSNPs found
+```
+## 5. Integrating existing strain-level classifications into PHLAME
+
+You can easily integrate existing strain-level classification scheme into a PHLAME database using the `-c` parameter in `phlame makedb`. `-c` takes a text file where each line reports the genome, then the group. This is the same format as the `_cladeIDs.txt` output by PHLAME, see `examples/output/output_Cacnes_cladeIDs.txt` for an example of the format. When you specify -c, PHLAME will only search for SNVs among the clades you define, and will not identify new clades automatically.
+
+```
+$ phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt -c Cacnes_cladeIDs_manual.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
