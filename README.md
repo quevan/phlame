@@ -11,6 +11,8 @@ Link to preprint is [here](https://www.biorxiv.org/content/10.1101/2025.02.07.63
 
 The data used in the manuscript is available [here](https://zenodo.org/records/15226099).
 
+Pre-built reference databases are available in `classifiers/`
+
 ## Installation
 
 You can install PHLAME using either pip or conda:
@@ -55,18 +57,19 @@ This tutorial uses the small set of files found in `example/` and is made to be 
 
 [0. Conceptual introduction to PHLAME](docs/conceptual_intro.md)
 
-[1. Building a database](docs/building_database_tutorial.md)\
-    *   [Collecting genomes your species of interest](docs/building_database_tutorial.md#1-collecting-genomes-for-your-species-of-interest)\
-    *   [Sequence data to candidate mutation table](docs/building_database_tutorial.md#2-sequence-data-to-candidate-mutation-table)\
-    *   [Creating a phylogeny](docs/building_database_tutorial.md#3-creating-a-phylogeny)\
-    *   [Making a PHLAME database](docs/building_database_tutorial.md#4-making-a-phlame-database)
+[1. Building a database](docs/building_database_tutorial.md)
+*   [Collecting genomes for your species of interest](docs/building_database_tutorial.md#1-collecting-genomes-for-your-species-of-interest)
+*   [Sequence data to candidate mutation table](docs/building_database_tutorial.md#2-sequence-data-to-candidate-mutation-table)
+*   [Creating a phylogeny](docs/building_database_tutorial.md#3-creating-a-phylogeny)
+*   [Making a PHLAME database](docs/building_database_tutorial.md#4-making-a-phlame-database)
+*   [Integrating existing strain-level classifications into PHLAME](docs/building_database_tutorial.md#5-integrating-existing-strain-level-classifications-into-phlame)
 
-[2. Classifying metagenome samples](docs/classifying_samples_tutorial.md)\
-    *   [Aligning metagenomic reads](docs/classifying_samples_tutorial.md#1-aligning-metagenomic-reads)\
-    *   [Running phlame classify](docs/classifying_samples_tutorial.md#2-running-phlame-classify)
+[2. Classifying metagenome samples](docs/classifying_samples_tutorial.md)
+*   [Aligning metagenomic reads](docs/classifying_samples_tutorial.md#1-aligning-metagenomic-reads)
+*   [Running phlame classify](docs/classifying_samples_tutorial.md#2-running-phlame-classify)
 
-[3. Intepreting PHLAME results](docs/interpreting_results_tutorial.md)\
-    *   [Visualizing classification results](docs/interpreting_results_tutorial.md#1-visualizing-classification-results)\
-    *   [Analyzing results at specific phylogenetic levels](docs/interpreting_results_tutorial.md#2-analyzing-results-at-specific-phylogenetic-levels)
+[3. Intepreting PHLAME results](docs/interpreting_results_tutorial.md)
+*   [Visualizing classification results](docs/interpreting_results_tutorial.md#1-visualizing-classification-results)
+*   [Analyzing results at specific phylogenetic levels](docs/interpreting_results_tutorial.md#2-analyzing-results-at-specific-phylogenetic-levels)
 
 
