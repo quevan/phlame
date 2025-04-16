@@ -24,10 +24,10 @@ In this tutorial we use the aligners [bowtie2](https://bowtie-bio.sourceforge.ne
 
 Installing bowtie2:
 ```
-conda install -c bioconda bowtie2
+$ conda install -c b ioconda bowtie2
 ```
 
-Running bowtie2 on a small .fastq file in `examples/`. Note that you only need to run `bowtie2-build` once.
+Running bowtie2 on a small .fastq file in `examples/`. Note that you only need to run `bowtie2-build` once for every new species.
 ```
 $ bowtie2-build -q reference_genome/Pacnes_C1.fasta reference_genome/Pacnes_C1_idx
 
@@ -39,7 +39,7 @@ To align assembled .fasta files, we will use bbmap instead of bowtie2 for speed.
 
 Installing bbmap:
 ```
-conda install -c bioconda bbmap
+$ conda install -c bioconda bbmap
 ```
 
 Running bbmap on a .fasta file in `examples/`
@@ -47,37 +47,29 @@ Running bbmap on a .fasta file in `examples/`
 $ bbmap.sh in=data/Cacnes_PMH5.fasta out=Cacnes_PMH5.sam ref=reference_genome/Pacnes_C1.fasta
 ```
 
-### Pileups
+### Converting .sam to .bam files
 For each aligned .sam file, we use samtools/bcftools to extract just our mutation data in .pileup and .vcf file formats.
 
 Installing samtools and bcftools:
 ```
-conda install -c bioconda samtools bcftools
+$ conda install -c bioconda samtools bcftools
 ```
 
 First, we use samtools to convert the .sam file to a .bam file (a compressed file format for alignment data)
 ```
-samtools view -bS Cacnes_PMH7.sam | samtools sort - -o Cacnes_PMH7.bam
-samtools index Cacnes_PMH7.bam
-rm Cacnes_PMH7.sam
+$ samtools view -bS Cacnes_PMH7.sam | samtools sort - -o Cacnes_PMH7.bam
+$ samtools index Cacnes_PMH7.bam
+$ rm Cacnes_PMH7.sam
 ```
 
-XXX SOMETHING HERE XXX
+### Counts objects
+
+Because .bam files can be quite large, we convert alignment data from individual genomes into a compressed format called a counts file using the `counts` function in PHLAME. Note that `phlame counts` requires samtools and bcftools installed
 ```
-$ samtools mpileup -q30 -x -s -O -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.pileup
-$ bcftools mpileup -q30 -t SP -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.vcf.tmp
-$ bcftools call -c -Oz -o Cacnes_PMH7.vcf.gz Cacnes_PMH7.vcf.tmp --ploidy 1
-$ bcftools view -Oz -v snps -q .75 Cacnes_PMH7.vcf.gz > Cacnes_PMH7.variant.vcf.gz
-$ tabix -p vcf Cacnes_PMH7.variant.vcf.gz
-$ rm Cacnes_PMH7.vcf.tmp
+$ phlame counts -i Cacnes_PMH7.bam -r reference_genome/Pacnes_C1.fasta -o Cacnes_PMH7.counts
 ```
 
-.bam files can be quite large. We convert data from .bam files into a compressed format (called a counts file) using the `counts` function in PHLAME.
-```
-$ phlame counts -p Cacnes_isolate_aligned.pileup -v Cacnes_isolate_aligned.sorted.strain.vcf.gz -w Cacnes_isolate_aligned.sorted.strain.variant.vcf.gz -r Pacnes_C1.fasta -o Cacnes_isolate.counts
-```
-
-### Candidate mutation table
+### Building the candidate mutation table
 
 Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already available in `example/counts/`.
 
@@ -87,12 +79,7 @@ You can create a candidate mutation table by specifying the counts files you wan
 $ phlame cmt -i counts_files.txt -s sample_names.txt -r reference_genome/Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
 ```
 
-## 3. Evaluating genome quality plots
-
-It's important to evaluate genome quality prior to constructing a database, as publicly available genomes can potentially be mislabelled, contaminated, or have assembly or sequencing errors that will affect downstream analyses. `phlame cmt` creates several optional QC plots that identify outliers among your genome collection, which potentially represent poor quality or mislabelled genomes.
-
-
-## 4. Creating a phylogeny
+## 3. Creating a phylogeny
 
 From a candidate mutation table, we can create a phylogeny and a PHLAME database using the commands `phlame tree` and `phlame makedb`, respectively.
 
@@ -112,25 +99,27 @@ $ phlame tree -i Cacnes_CMT.pickle.gz -p Cacnes.phylip -r Cacnes_phylip2names.tx
 ```
 
 ### Viewing your tree
-We recommend visualizing your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases) before moving on to the database creation step. Looking at the phylogeny will give important information when making the database, including how many clades there are, what branch length threshold to set, how similar the reference genomes are to one another, and where to root the phylogeny. The phylogeny should be rooted in some way before inputting into the `makedb` step.
+We recommend visualizing your tree (for example, using [FigTree](https://github.com/rambaut/figtree/releases)) before moving on to the database creation step. Looking at the phylogeny will give important information when making the database, including how many clades there are, what branch length threshold to set, how similar the reference genomes are to one another, and where to root the phylogeny.
 
 Our rooted phylogeny in `example/` looks like this:
 
-![alt text](example/tree.png)
+![alt text](docs/tree.png)
 
 At a quick glance, it looks like there are 3 distinct clades in our phylogeny, separated by a minimum branch length of ~623 SNVs. By default, PHLAME will rescale branch lengths into absolute numbers of SNVs when the correlation between the two is sufficiently high (>0.75). 
 
 A key parameter to give to `makedb` is `--min_branchlen`, which defines the minimum branch length for a branch of the phylogeny to be considered a clade. This parameter cannot really be determined a priori, and must be hand-selected after viewing the tree. For the purposes of this tutorial, we will use a minimum branch length of 500 SNVs.
 
-## 5. Making a PHLAME database
+## 4. Making a PHLAME database
 
 Now that we have both our candidate mutation table and our tree, we can run the `makedb` step, which will detect candidate clades in our phylogeny and their corresponding clade-specific mutations. Construction of the actual PHLAME database is done using the `makedb` command. To see the full list of options, check the [manual](docs/manual.md) or the help option (`phlame makedb -h`). 
+
+The phylogeny should be rooted in some way before inputting into the `makedb` step. You can specify `--midpoint` to default midpoint root the phylogeny.
 
 ```
 $ phlame makedb -i Cacnes_CMT.pickle.gz -t rescaled_Cacnes.tree -o Cacnes_db.classifier -p Cacnes_cladeIDs.txt --min_branchlen 500 --min_leaves 2 --midpoint
 ```
 
-The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. You can specify `--midpoint` to default midpoint root the phylogeny. In addition, the number of clade-specific mutations found for each clade are give in the stdout:
+The two outputs of the `makedb` step are the compressed database and a text file giving the identifies of each clade. In addition, the number of clade-specific mutations found for each clade are printed to stdout:
 ```
 Reading in files...
 Number of core positions: 16280/17491

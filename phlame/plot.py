@@ -377,6 +377,62 @@ def plot_classifier(path_to_classifier):
     
     return fig
 
+def plot_sample_coverage(coverage,
+                        coverage_cutoff):
+
+    coverage_median = np.median(coverage,axis=0)
+
+    fig, axs = plt.subplots()
+    
+    maxcov=coverage_median.max()
+    maxcovbin=np.ceil(maxcov/10)*10+10
+    my_bins = np.arange(0,int(maxcovbin),5)
+    n, bins, patches = plt.hist(x=coverage_median, bins=my_bins, color='#0504aa', alpha=0.7, rwidth=0.85)
+    plt.grid(axis='y', alpha=0.75)
+    plt.xlabel('Median coverage')
+    plt.axvline(coverage_cutoff, color='r')
+    plt.ylabel('Number of samples')
+    plt.title('Median coverage across samples')
+    
+    return fig
+
+def plot_position_presence(presence_arr,
+                            max_ns_cutoff,
+                            filter_name):
+    
+    fig, axs = plt.subplots()
+
+    my_bins = np.linspace( np.min(presence_arr), np.max(presence_arr), 100 )
+    axs.hist(x=presence_arr, bins=my_bins, 
+            color='#0504aa', alpha=0.7, rwidth=0.85)
+    
+    plt.grid(axis='y', alpha=0.75)
+    plt.xlabel(filter_name)
+    plt.ylabel('Number of positions')
+    # Add a line at filter cutoff
+    plt.axvline(x = max_ns_cutoff, color = 'r')
+    
+    return fig
+
+def plot_sample_breadth(breadth_bysample_arr,
+                        min_breadth_cutoff):
+    
+    fig, axs = plt.subplots()
+    
+    # max()
+    # my_bins = np.arange(0,1,0.01)
+    
+    n, bins, patches = plt.hist(x=breadth_bysample_arr, bins=20, 
+                                color='#0504aa', alpha=0.7, rwidth=0.85)
+    plt.grid(axis='y', alpha=0.75)
+    plt.xlabel('Percentage of positions with Ns per sample')
+    plt.axvline(min_breadth_cutoff, color='r')
+    plt.ylabel('Number of samples')
+    # plt.title('Median coverage across samples')
+    
+    return fig
+
+
 # #%% Re-model a specific clade
 
 # nchain = 10000

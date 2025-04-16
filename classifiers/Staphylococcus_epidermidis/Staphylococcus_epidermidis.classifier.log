@@ -1,0 +1,72 @@
+phlame_.py makedb -i candidate_mutation_table/Sepi_acera_repCMT_nodoubletons.pickle.gz -c trees/Sepi_acera_norecomb_GTR_clades.txt -o Sepi_acera_norecomb_GTR.classifier --min_snps 10 --maxn 0.3 --core 0.1
+/Users/evanqu/miniconda3/lib/python3.9/site-packages/ete3-3.1.2-py3.7.egg/ete3/evol/parser/codemlparser.py:221: SyntaxWarning: "is" with a literal. Did you mean "=="?
+/Users/evanqu/miniconda3/lib/python3.9/site-packages/ete3-3.1.2-py3.7.egg/ete3/evol/parser/codemlparser.py:221: SyntaxWarning: "is" with a literal. Did you mean "=="?
+Reading in files...
+Number of core positions: 257492/258745
+Getting unanimous alleles...
+Getting unique alleles...
+The following clades had fewer than 10 specific SNPs and will be removed:
+C.2.2.1.2
+
+C.2.2.1.2.1
+
+C.2.2.1.2.2
+
+C.2.2.1.2.2.1
+
+C.2.2.1.2.2.1.1
+
+C.2.2.1.3
+
+C.2.2.1.3.2
+
+C.2.2.1.3.2.2
+
+C.2.2.1.3.2.2.1
+
+C.2.2.1.3.2.2.1.1
+
+C.2.2.1.3.2.2.1.1.1.1
+
+C.2.2.1.3.2.4
+
+Classifier results:
+Clade C.1: 7193 csSNPs found
+Clade C.1.1: 657 csSNPs found
+Clade C.1.2: 3662 csSNPs found
+Clade C.1.2.1: 895 csSNPs found
+Clade C.1.2.1.1: 1025 csSNPs found
+Clade C.1.2.2: 417 csSNPs found
+Clade C.1.2.2.1: 571 csSNPs found
+Clade C.1.2.2.1.1: 2677 csSNPs found
+Clade C.1.2.2.1.2: 753 csSNPs found
+Clade C.1.2.2.1.2.1: 1044 csSNPs found
+Clade C.1.2.2.2: 1103 csSNPs found
+Clade C.2: 7186 csSNPs found
+Clade C.2.1: 4905 csSNPs found
+Clade C.2.1.1: 3958 csSNPs found
+Clade C.2.1.2: 4524 csSNPs found
+Clade C.2.2: 1830 csSNPs found
+Clade C.2.2.1: 116 csSNPs found
+Clade C.2.2.1.1: 110 csSNPs found
+Clade C.2.2.1.1.1: 561 csSNPs found
+Clade C.2.2.1.2.1.1: 101 csSNPs found
+Clade C.2.2.1.2.1.2: 289 csSNPs found
+Clade C.2.2.1.2.1.3: 146 csSNPs found
+Clade C.2.2.1.2.1.3.1: 225 csSNPs found
+Clade C.2.2.1.2.1.3.2: 239 csSNPs found
+Clade C.2.2.1.2.2.2: 97 csSNPs found
+Clade C.2.2.1.3.1: 37 csSNPs found
+Clade C.2.2.1.3.1.1: 214 csSNPs found
+Clade C.2.2.1.3.1.1.1: 241 csSNPs found
+Clade C.2.2.1.3.1.1.1.1: 412 csSNPs found
+Clade C.2.2.1.3.1.1.1.1.1: 204 csSNPs found
+Clade C.2.2.1.3.2.1: 68 csSNPs found
+Clade C.2.2.1.3.2.1.1: 163 csSNPs found
+Clade C.2.2.1.3.2.2.1.1.1: 42 csSNPs found
+Clade C.2.2.1.3.2.2.1.1.1.1.1: 52 csSNPs found
+Clade C.2.2.1.3.2.2.2: 17 csSNPs found
+Clade C.2.2.1.3.2.3: 245 csSNPs found
+Clade C.2.2.1.3.2.3.1: 116 csSNPs found
+Clade C.2.2.1.3.2.4.1: 333 csSNPs found
+

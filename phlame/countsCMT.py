@@ -7,9 +7,14 @@ import numpy as np
 import gzip
 import os
 import pickle
-import phlame.helper_functions as helper
 import glob
+import tempfile
+import shlex
+import subprocess
+import shutil
 
+import phlame.helper_functions as helper
+import phlame.plot as phlame_plot
 
 #%% combine_positions.py
 
@@ -206,46 +211,113 @@ class CombinePositions():
 
 class Pileup2Diversity:
 
-    def __init__(self, 
-                 path_to_pileup,
-                 path_to_vcf,
-                 path_to_variant_vcf,
+    def __init__(self,
+                 path_to_bam_file,
                  path_to_ref,
+                 path_to_vcf_file=None,
+                 path_to_variant_vcf_file=None,
+                 path_to_pileup_file=None,
                  path_to_output_diversity=None):
         
-        self.path_to_pileup = path_to_pileup
-        self.path_to_vcf = path_to_vcf
-        self.path_to_variant_vcf = path_to_variant_vcf
-
+        self.__path_to_bam_file = path_to_bam_file
+        self.__ref_file = path_to_ref
         self.path_to_output_diversity = path_to_output_diversity
 
-        self.chr_starts, self.genome_length, self.scaf_names = helper.genomestats(path_to_ref)
+        self.__path_to_vcf_file = path_to_vcf_file
+        self.__path_to_variant_vcf_file = path_to_variant_vcf_file
+        self.__path_to_pileup_file = path_to_pileup_file
+
+        self.chr_starts, self.genome_length, self.scaf_names = helper.genomestats(self.__ref_file)
 
     def main(self):
 
-        data, coverage = self.pileup2diversity(self.path_to_pileup,
-                                               self.chr_starts,
-                                               self.genome_length,
-                                               self.scaf_names)
+        self.dependency_check()
         
-
-        quals_sample = Vcf2Quals.vcf_to_quals(self.path_to_vcf,
-                                              self.chr_starts,
-                                              self.genome_length,
-                                              self.scaf_names)
-        
-        variant_pos = self.generate_positions_single_sample(self.path_to_variant_vcf)
-        
+        self.process_data()
 
         if self.path_to_output_diversity:
 
-            self.write_diversity(data, quals_sample, variant_pos,
+            self.write_diversity(self.data, self.quals_sample, self.variant_pos,
                                  self.path_to_output_diversity)
+
+
+    def dependency_check(self):
+        
+        if shutil.which("samtools") is None:
+            raise RuntimeError("samtools is not installed or not in your PATH.")
+        
+        if shutil.which("bcftools") is None:
+            raise RuntimeError("bcftools is not installed or not in your PATH.")
+
+    def process_data(self):
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+        
+            self.__pileup_file = shlex.quote(os.path.join(temp_dir, 'temp.pileup'))
+            self.__vcf_tmp_file = shlex.quote(os.path.join(temp_dir, 'temp.vcf.tmp'))
+            self.__vcf_file = shlex.quote(os.path.join(temp_dir, 'temp.vcf.gz'))
+            self.__variant_vcf_file = shlex.quote(os.path.join(temp_dir, 'temp.variant.vcf.gz'))
+
+                        
+            print("Running samtools mpileup...")
+            print(f"samtools mpileup -q30 -x -s -O -d3000 "+ \
+                           f"-f {shlex.quote(self.__ref_file)} "+ \
+                           f"{shlex.quote(self.__path_to_bam_file)} > {self.__pileup_file}")
+            
+            subprocess.run(f"samtools mpileup -q30 -x -s -O -d3000 "+ \
+                           f"-f {shlex.quote(self.__ref_file)} "+ \
+                           f"{shlex.quote(self.__path_to_bam_file)} > {self.__pileup_file}", shell=True)
+            
+            print("Running bcftools mpileup...")
+            print(f"bcftools mpileup -q30 -t SP -d3000 "+ \
+                           f"-f {shlex.quote(self.__ref_file)} "+ \
+                           f"{shlex.quote(self.__path_to_bam_file)} > {self.__vcf_tmp_file}")
+            subprocess.run(f"bcftools mpileup -q30 -t SP -d3000 "+ \
+                            f"-f {shlex.quote(self.__ref_file)} "+ \
+                            f"{shlex.quote(self.__path_to_bam_file)} > {self.__vcf_tmp_file}", shell=True)
+            
+            print("Running bcftools call...")
+            print(f"bcftools call -c -Oz -o {self.__vcf_file} "+ \
+                           f"{self.__vcf_tmp_file} --ploidy 1")
+            subprocess.run(f"bcftools call -c -Oz -o {self.__vcf_file} "+ \
+                            f"{self.__vcf_tmp_file} --ploidy 1", shell=True)
+            
+            print("Running bcftools view...")
+            print(f"bcftools view -Oz -v snps -q .75 {self.__vcf_file} > {self.__variant_vcf_file}")
+            subprocess.run(f"bcftools view -Oz -v snps -q .75 {self.__vcf_file} > {self.__variant_vcf_file}", shell=True)
+
+            print("Running tabix...")
+            print(f"tabix -p vcf {self.__variant_vcf_file}")
+            subprocess.run(f"tabix -p vcf {self.__variant_vcf_file}", shell=True)
+
+            # ```
+            # $ samtools mpileup -q30 -x -s -O -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.pileup
+            # $ bcftools mpileup -q30 -t SP -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.vcf.tmp
+            # $ bcftools call -c -Oz -o Cacnes_PMH7.vcf.gz Cacnes_PMH7.vcf.tmp --ploidy 1
+            # $ bcftools view -Oz -v snps -q .75 Cacnes_PMH7.vcf.gz > Cacnes_PMH7.variant.vcf.gz
+            # $ tabix -p vcf Cacnes_PMH7.variant.vcf.gz
+            # $ rm Cacnes_PMH7.vcf.tmp
+            # ```
+
+            self.data, self.coverage = self.pileup2diversity(self.__pileup_file,
+                                        self.chr_starts,
+                                        self.genome_length,
+                                        self.scaf_names)
+        
+            self.quals_sample = Vcf2Quals.vcf_to_quals(self.__vcf_file,
+                                                self.chr_starts,
+                                                self.genome_length,
+                                                self.scaf_names)
+            
+            self.variant_pos = self.generate_positions_single_sample(self.__variant_vcf_file)
+
 
     @staticmethod
     def write_diversity(data,
                         quals_sample,
                         variant_pos, path_to_output_diversity):
+        
+        print(f"Saving data to {path_to_output_diversity}...")
         
         diversity = {'data': data,
                      'quals': quals_sample,
@@ -580,44 +652,71 @@ class Case():
             self.indel_counter[:, :, i] = data[self.p - 1, 8:10].T  # Num reads supporting indels and reads supporting deletions
             self.quals[:, i] = quals_sample[self.p - 1]  # -1 is to convert position to index
 
-        # ## counts: counts for each base from forward and reverse reads at each candidate position for all samples
-        # print('Gathering counts data at each candidate position...\n')
-
-        # # Import list of directories for where to diversity file for each sample
-        # dim=8
-        # self.counts = np.zeros((dim, len(self.p), nsamples), dtype='uint')  # initialize
-        # self.indel_counter = np.zeros((2, len(self.p), nsamples), dtype='uint')
-
-        # for i, mpileup_file in enumerate(self.path_to_mpileup_files):
-
-        #     data, coverage = Pileup2Diversity.pileup2diversity(mpileup_file,
-        #                                                        self.chr_starts,
-        #                                                        self.genome_length,
-        #                                                        self.scaf_names)
-
-        #     self.counts[:, :, i] = data[self.p - 1, 0:dim].T  # -1 convert position to index
-        #     self.indel_counter[:, :, i] = data[self.p - 1, 8:10].T  # Num reads supporting indels and reads supporting deletions
-
-
-        # ## Quals: quality score (relating to sample purity) at each position for all samples
-        # print('Gathering quality scores at each candidate position...')
-        # # Import list of directories for where to quals for each sample
-
-        # self.quals = np.zeros((len(self.p), nsamples), dtype='int')  # initialize
-
-        # for i, vcf_file in enumerate(self.path_to_vcf_files):
-            
-        #     quals_sample = Vcf2Quals.vcf_to_quals(vcf_file,
-        #                                           self.chr_starts,
-        #                                           self.genome_length,
-        #                                           self.scaf_names)
-                    
-
-        #     quals_sample = quals_sample.flatten()
-        #     self.quals[:, i] = quals_sample[self.p - 1]  # -1 is to convert position to index
-
-
         self.write_CMT()
+
+    def QC_plots(self):
+
+        # Default thresholds
+
+        self.minimum_coverage = 8
+        self.min_presence_core = 0.9
+
+        # =============================================================================
+        #  Filter samples by coverage
+        # =============================================================================
+
+        coverage = self.counts.sum(axis=0)
+
+        fig = phlame_plot.plot_coverage_hist(coverage,
+                                             self.minimum_coverage)
+        
+        fig.savefig(self.path_to_out_cmt + '.sample_coverage.pdf',
+                    bbox_inches='tight', format='pdf')
+        
+        # =========================================================================
+        #  Filter by position
+        # =========================================================================
+
+        [maNT, maf, minorNT, minorAF] = helper.mant(counts)
+
+        fig = plot_position_presence(np.count_nonzero(maNT, axis=1), 
+                                     self.min_presence_core,
+                                     'Presence (not N) across samples')
+        
+        fig.savefig(self.path_to_out_cmt + '.position_presence.pdf',
+                    bbox_inches='tight', format='pdf')
+        
+        # Booleans are all INCLUSION criteria!
+        # Must be present (not N) in some fraction of samples
+        min_core_bool = ( np.count_nonzero(maNT, axis=1) >= self.min_presence_core )
+
+        goodcalls = maNT[min_core_bool,:]
+
+        # =============================================================================
+        #  Filter by sample
+        # =============================================================================
+        
+        fig = plot_samples_hist(1-(np.count_nonzero(goodcalls, axis=0)/len(goodcalls)),
+                                float(filterby_sample['max_frac_ambiguous_pos']))
+        fig.show()
+
+        fig.savefig(self.path_to_out_cmt + '.sample_breadth.pdf',
+                    bbox_inches='tight', format='pdf')
+        
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
 
     def write_CMT(self):
 
@@ -635,17 +734,3 @@ class Case():
         print("Saving " + self.path_to_out_cmt)
         with gzip.open(file_path, 'wb') as f:
             pickle.dump(CMT, f)
-
-    # @staticmethod
-    # def parse_file_list(path_to_file):
-    #     with open(path_to_file, 'r') as f:
-    #         file_list = f.read().splitlines()
-
-    #     for file_ in file_list:
-    #         if not os.path.isabs(file_):
-    #             abs_path = os.path.abspath(file_)
-    #             if not os.path.exists(abs_path):
-    #                 raise FileNotFoundError(f"File not found: {abs_path}")
-    #             file_list[file_list.index(file_)] = os.path.abspath(file_)
-
-    #     return file_list
