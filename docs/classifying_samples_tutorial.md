@@ -10,11 +10,6 @@ See `snakemake_classify` for an snakemake that takes you from metagenomic sequen
 
 We use bowtie2 in this tutorial to align short reads, but any aligner that produces compatible .bam files could work in theory.
 
-Installing bowtie2 and samtools:
-```
-conda install -c bioconda bowtie2 samtools
-```
-
 ```
 $ bowtie2 -X 2000 --no-mixed --dovetail -x Pacnes_C1.fasta -1 5X_skinmg_A_1.fastq.gz -2 5X_skinmg_A_2.fastq.gz -S skinmg_A.sam
 ```
@@ -39,7 +34,7 @@ To see the full list of options, check the [manual](docs/manual.md) or the help 
 
 We can run `phlame classify` using default parameters as follows:
 ```
-phlame classify -i skin_mg_A.sam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data
+$ phlame classify -i skin_mg_A.sam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data
 ```
 
 After running, the classify step will output a frequencies file, as well as a compressed data file. The output of a frequencies file will look like this:
@@ -53,7 +48,7 @@ C.2.2,0.0,0.6815,0.0
 ```
 
 The 3 fields that PHLAME will return are: 
-*   Relative abundace: the estimated relative abundance of the clade in the sample
+*   Relative abundance: the estimated relative abundance of the clade in the sample
 *   DVb, which represents the estimated divergence of the sample from the MRCA of that clade. Go [here](docs/xxx.md) for a conceptual introduction to divergence.
 *   Probability Score, which represents the overall probability that the sample supports a clade that is within your `--max_pi` threshold. The Probability Score only has information in the Bayesian implementation of PHLAME, and will either be 1 or 0 in the MLE version. 
 

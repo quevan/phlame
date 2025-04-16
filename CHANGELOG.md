@@ -1,3 +1,6 @@
+## [1.0.8] - 2024-04-16
+- Moved samtools and bcftools commands into phlame counts, changed input of phlame counts to .bam file
+
 ## [1.0.7] - 2024-04-10
 - Added mean coverage information into classify output
 

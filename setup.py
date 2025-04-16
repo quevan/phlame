@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='phlame',
-    version='1.0.7',
+    version='1.0.8',
     packages=find_packages(),
     description='Novelty-aware intraspecies profiling of metagenome samples',
     url='https://github.com/quevan/phlame',
