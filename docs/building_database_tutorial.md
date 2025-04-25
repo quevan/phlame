@@ -24,7 +24,7 @@ In this tutorial we use the aligners [bowtie2](https://bowtie-bio.sourceforge.ne
 
 Installing bowtie2:
 ```
-$ conda install -c b ioconda bowtie2
+$ conda install -c bioconda bowtie2
 ```
 
 Running bowtie2 on a small .fastq file in `examples/`. Note that you only need to run `bowtie2-build` once for every new species.

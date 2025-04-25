@@ -3,14 +3,12 @@
 
 ## Overview
 
-You can view the core commands of PHLAME with `phlame -h`
+You can view the core commands of PHLAME with `phlame -h`.
 
 ```
-            ...::: PHLAME v1.0 :::...
-       Evan Qu, Lieberman Lab, MIT. 2025
+            ...::: PHLAME v.1.1.X :::...
 
 Usage: phlame [-h] {classify,makedb,tree} ...
-
 
 Choose one of the operations below for more detailed help.
 Example: phlame classify -h
@@ -23,11 +21,15 @@ Main operations:
 Auxiliary operations:
     plot -> Generate informative plots from classify output.
     cmt -> Convert counts files into a candidate mutation table.
-    counts -> Convert aligned pileup files into compressed counts matrix format.
+    counts -> Convert aligned .bam files into compressed counts matrix format.
 
 ```
 
 ## PHLAME classify
+
+The `classify` operation is the main function used to analyze metagenomes. It takes as input an aligned .bam file and a classifier file, and outputs a frequencies file and a data file.
+
+An important paramter to specify is `-m`, which tells the program what inference mode to use (either `mle` or `bayesian`). 
 
 ```
 usage: phlame classify [-h] -i INPUT -c CLASSIFIER -r REF [-l LEVEL] -o OUTPUT [-p OUTPUTDATA] -m {bayesian,mle} [--max_pi MAX_PI] [--min_snps MIN_SNPS] [--min_prob MIN_PROB] [--min_hpd MIN_HPD] [--seed SEED] [--verbose]
@@ -50,6 +52,8 @@ options:
 ```
 
 ## PHLAME makedb
+
+The `makedb` operation turns a candidate mutation table and a phylogeny into a PHLAME reference database. See the tutorial for instructions on how to create a candidate mutation table.
 
 ```
 usage: phlame makedb [-h] -i INPUT -t INTREE -o OUTDB -p OUTCLADES [-y OUTTREE] [-c INCLADES] [--outgroup OUTGROUP] [--max_outgroup MAX_OUTGROUP] [--min_snps MIN_SNPS] [--maxn MAXN] [--core CORE] [--min_branchlen MIN_BRANCHLEN]
@@ -85,6 +89,8 @@ options:
 ```
 
 ## PHLAME tree
+
+The `tree` operation turns a candidate mutation table into a core-genome phylogeny. 
 
 ```
 usage: phlame tree [-h] [-i CMT] [-o OUTTREE] [-p OUTPHYLIP] [-r RENAMING] [-q INPHYLIP] [--rescale] [--min_cov MIN_COV] [--minAF MINAF] [--min_strand_cov MIN_STRAND_COV] [--qual QUAL] [--core CORE]
@@ -146,6 +152,8 @@ options:
 
 
 ## PHLAME cmt
+
+The `cmt` operation creates a candidate mutation table, which stores allelic information across many individual reference genomes together. 
 
 ```
 usage: phlame cmt [-h] -i COUNTS_FILES -s SAMPLE_NAMES -r REF -o OUT_CMT
