@@ -12,9 +12,11 @@ We recommend a *minimum* of a dozen genomes to construct a reference database wi
 
 PHLAME does not require dereplicating reference genomes before database construction. In fact, we benefit from there being many similar genomes in a database, as it becomes easier to spot individual genomes with sequencing or variant call errors. However, you many want to dereplicate very large genome databases (1000+ genomes) to reduce computational time, especially in the tree-building step.
 
+IMPORTANT: You need to have one reference genome in .fasta format to align all others against (we call this the species-specific reference genome). Ideally, this reference genome should be of higher quality and completeness. This can either be one of the genomes in your database, or a standard type genome for the species (like those found on NCBI [Genome](https://www.ncbi.nlm.nih.gov/datasets/genome/)). 
+
 ## 2. Sequence data to candidate mutation table
 
-PHLAME uses a compressed object called a candidate mutation table to store alignment information from many genomes. To create one, we first need to align each of our database genomes to a species-specific reference genome (in .fasta format). This can either be one of the genomes in your database, or a standard type genome for the species (like those found on NCBI [Genome](https://www.ncbi.nlm.nih.gov/datasets/genome/)). 
+PHLAME uses a compressed object called a candidate mutation table to store alignment information from many genomes. To create one, we first need to align each of our database genomes to our species-specific reference genome (in .fasta format)
 
 For a snakemake that takes you through the steps of turning sequence data into a candidate mutation table, see `snakemake_makedb`. 
 
@@ -27,11 +29,11 @@ Installing bowtie2:
 $ conda install -c bioconda bowtie2
 ```
 
-Running bowtie2 on a small .fastq file in `examples/`. Note that you only need to run `bowtie2-build` once for every new species.
+Here, we are aligning the database genome `Cacnes_PMH7` against our species-specific reference genome `Pacnes_C1`.We can use bowtie2 to align .fastq files (i.e., raw reads). Note that you only need to run `bowtie2-build` once for every new species. 
 ```
 $ bowtie2-build -q reference_genome/Pacnes_C1.fasta reference_genome/Pacnes_C1_idx
 
-$ bowtie2 -X 2000 --no-mixed --dovetail -x reference_genome/Pacnes_C1_idx -1 data/Cacnes_PMH7R1.fastq.gz -2 data/Cacnes_PMH7R2.fastq.gz -S Cacnes_PMH7.sam
+$ bowtie2 -X 2000 --no-mixed --dovetail -x reference_genome/Pacnes_C1_idx -1 data/Cacnes_PMH7R1.fastq.gz -2 data/Cacnes_PMH7R2.fastq.gz -S data/Cacnes_PMH7.sam
 ```
 
 ### Aligning .fasta files 
@@ -44,7 +46,7 @@ $ conda install -c bioconda bbmap
 
 Running bbmap on a .fasta file in `examples/`
 ```
-$ bbmap.sh in=data/Cacnes_PMH5.fasta out=Cacnes_PMH5.sam ref=reference_genome/Pacnes_C1.fasta
+$ bbmap.sh in=data/Cacnes_PMH5.fasta out=data/Cacnes_PMH5.sam ref=reference_genome/Pacnes_C1.fasta
 ```
 
 ### Converting .sam to .bam files
@@ -57,9 +59,9 @@ $ conda install -c bioconda samtools bcftools
 
 First, we use samtools to convert the .sam file to a .bam file (a compressed file format for alignment data)
 ```
-$ samtools view -bS Cacnes_PMH7.sam | samtools sort - -o Cacnes_PMH7.bam
-$ samtools index Cacnes_PMH7.bam
-$ rm Cacnes_PMH7.sam
+$ samtools view -bS data/Cacnes_PMH7.sam | samtools sort - -o data/Cacnes_PMH7.bam
+$ samtools index data/Cacnes_PMH7.bam
+$ rm data/Cacnes_PMH7.sam
 ```
 
 ### Counts objects
@@ -73,7 +75,9 @@ $ phlame counts -i Cacnes_PMH7.bam -r reference_genome/Pacnes_C1.fasta -o Cacnes
 
 Data from many counts files is aggregated into a candidate mutation table. For this, several counts files are already available in `example/counts/`.
 
-You can create a candidate mutation table by specifying the counts files you want aggregated and their corresponding sample names in newline-delimited files. The number and order of sample names should match the number and order of the counts files. You can check the [manual](manual.md) or the help option (`phlame cmt -h`) for more options.
+You can create a candidate mutation table by specifying the counts files you want aggregated and their corresponding sample names in newline-delimited files. The number and order of sample names should match the number and order of the counts files. 
+
+You can check the [manual](manual.md) or the help option (`phlame cmt -h`) for more options.
 
 ```
 $ phlame cmt -i counts_files.txt -s sample_names.txt -r reference_genome/Pacnes_C1.fasta -o Cacnes_CMT.pickle.gz
@@ -85,7 +89,7 @@ From a candidate mutation table, we can create a phylogeny and a PHLAME database
 
 Using the integrated tree-building step requires RaXML installed.
 ```
-$ conda install raxml
+$ conda install -c bioconda raxml
 ```
 
 You can run the integrated `tree` step as follows:
