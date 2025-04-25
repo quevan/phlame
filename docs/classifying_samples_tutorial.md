@@ -11,14 +11,14 @@ See `snakemake_classify` for an snakemake that takes you from metagenomic sequen
 We use bowtie2 in this tutorial to align short reads, but any aligner that produces compatible .bam files could work in theory.
 
 ```
-$ bowtie2 -X 2000 --no-mixed --dovetail -x Pacnes_C1.fasta -1 5X_skinmg_A_1.fastq.gz -2 5X_skinmg_A_2.fastq.gz -S skinmg_A.sam
+$ bowtie2 -X 2000 --no-mixed --dovetail -x reference_genome/Pacnes_C1_idx -1 data/5X_skinmg_A_1.fastq.gz -2 data/5X_skinmg_A_2.fastq.gz -S data/skinmg_A.sam
 ```
 
 We use samtools to convert the .sam file to a .bam file (a compressed file format for alignment data)
 ```
-$ samtools view -bS skinmg_A.sam | samtools sort - -o skinmg_A.bam
-$ samtools index skinmg_A.bam
-$ rm skinmg_A.sam
+$ samtools view -bS data/skinmg_A.sam | samtools sort - -o data/skinmg_A.bam
+$ samtools index data/skinmg_A.bam
+$ rm data/skinmg_A.sam
 ```
 
 ## 2. Running phlame classify
@@ -34,7 +34,7 @@ To see the full list of options, check the [manual](manual.md) or the help optio
 
 We can run `phlame classify` using default parameters as follows:
 ```
-$ phlame classify -i skin_mg_A.sam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data
+phlame classify -i data/skinmg_A.bam -c Cacnes_db.classifier -r reference_genome/Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data
 ```
 
 After running, the classify step will output a frequencies file, as well as a compressed data file. The output of a frequencies file will look like this:
