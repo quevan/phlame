@@ -39,7 +39,7 @@ $ bowtie2 -X 2000 --no-mixed --dovetail -x reference_genome/Pacnes_C1_idx -1 dat
 ### Aligning .fasta files 
 To align assembled .fasta files, we recommend simulating short reads from your .fasta file first. To do this, you can use `wgsim`, or any other short read simulator.
 
-Installing bbmap:
+Installing wgsim:
 ```
 $ conda install -c bioconda wgsim
 ```
