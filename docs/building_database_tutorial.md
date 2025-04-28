@@ -37,17 +37,20 @@ $ bowtie2 -X 2000 --no-mixed --dovetail -x reference_genome/Pacnes_C1_idx -1 dat
 ```
 
 ### Aligning .fasta files 
-To align assembled .fasta files, we will use bbmap instead of bowtie2 for speed.
+To align assembled .fasta files, we recommend simulating short reads from your .fasta file first. To do this, you can use `wgsim`, or any other short read simulator.
 
 Installing bbmap:
 ```
-$ conda install -c bioconda bbmap
+$ conda install -c bioconda wgsim
 ```
 
-Running bbmap on a .fasta file in `examples/`
+Here, we are using wgsim to simulate 200,000 150bp paired-end reads from a .fasta file in `examples/`
 ```
-$ bbmap.sh in=data/Cacnes_PMH5.fasta out=data/Cacnes_PMH5.sam ref=reference_genome/Pacnes_C1.fasta
+$ wgsim -e 0.0 -d 500 -N 200000 -1 150 -2 150 -r 0.0 -R 0.0 -X 0.0 data/Cacnes_PMH5.fasta data/Cacnes_PMH5R1.fastq data/Cacnes_PMH5R2.fastq
+$ gzip data/Cacnes_PMH5R1.fastq data/Cacnes_PMH5R2.fastq
 ```
+
+From here, you can align your files similarly to .fastq files.
 
 ### Converting .sam to .bam files
 For each aligned .sam file, we use samtools/bcftools to extract just our mutation data in .pileup and .vcf file formats.
@@ -68,7 +71,7 @@ $ rm data/Cacnes_PMH7.sam
 
 Because .bam files can be quite large, we convert alignment data from individual genomes into a compressed format called a counts file using the `counts` function in PHLAME. Note that `phlame counts` requires samtools and bcftools installed
 ```
-$ phlame counts -i Cacnes_PMH7.bam -r reference_genome/Pacnes_C1.fasta -o Cacnes_PMH7.counts
+$ phlame counts -i data/Cacnes_PMH7.bam -r reference_genome/Pacnes_C1.fasta -o data/Cacnes_PMH7.counts
 ```
 
 ### Building the candidate mutation table
