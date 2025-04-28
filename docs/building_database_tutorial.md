@@ -20,7 +20,7 @@ PHLAME uses a compressed object called a candidate mutation table to store align
 
 For a snakemake that takes you through the steps of turning sequence data into a candidate mutation table, see `snakemake_makedb`. 
 
-In this tutorial we use the aligners [bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and [bbmap](https://sourceforge.net/projects/bbmap/#:~:text=BBMap%3A%20Short%20read%20aligner%20for,error%2Dcorrection%20and%20normalization%20tool.), but any alignment software that produces compatible bam files could be used.
+In this tutorial we use the aligners [bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml), but any alignment software that produces compatible bam files could be used.
 
 ### Aligning .fastq files
 
