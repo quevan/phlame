@@ -21,22 +21,29 @@ In this particular example, The posterior densities all have fairly high spreads
 
 ## 2. Analyzing results at specific phylogenetic levels
 
-By default, PHLAME reports results for every clade in the phylogeny simultaneously. In order to generate downstream analyses like taxonomic bar plots and ordination plots, you need to select a set of non-overlapping clades (a level) to analyze results at.
+By default, PHLAME reports results for every clade in the phylogeny simultaneously, including clades that are direct ancestors or descendants of one another. In order to make classic microbiome visualizations like taxonomic bar plots, you need to select a set of non-overlapping clades (a level) to analyze results at.
 
-![alt text](profile.png)
+<img src="profile.png" width="500">
 
-If you already know what phylogenetic level you are interested in, you can ask PHLAME to classify only at those clades using the `-l` parameter in `phlame classify`. You can specify clades as either a string list of clade names or a clade_IDs file.
+
+You can tell PHLAME to classify at only a specific set of clades using the `-l` parameter in `phlame classify`. By default, PHLAME names clades C.1, C.2, C.3 ... starting from the root, and names acquire more breaks as you go towards the tips of the tree (for example, C.2.1 and C.2.2 would be descendants of C.2).
 
 ```
-$ phlame classify -i skin_mg_A.sam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data -l 'C.1,C.2'
-```
-or
-```
-$ phlame classify -i skin_mg_A.sam -c Cacnes_db.classifier -r Pacnes_C1.fasta -m bayesian -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data -l Cacnes_cladeIDs.txt
+$ phlame classify -i data/skinmg_A.bam -c Cacnes_db.classifier -r reference_genome/Pacnes_C1.fasta -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data -l 'C.1,C.2'
 ```
 
-Note that total inferred frequencies at a specific phylogenetic level may sum to less than 1, reflecting the presence of uncharacterized or novel clades in the sample. This effect is more pronounced at more-finely resolved phylogenetic clades, as you are less likely to also have that clade in an unrelated sample. In rare cases, total frequencies may sum to a value above 1. To address this, we recommend normalizing cases that sum above 1 down to 1.
+If you want to name your clades something else, you can also tell PHLAME to classify using a cladeIDs file (this is the same type of file output by `phlame makedb`). 
 
-One useful way to analyze PHLAME results is using a coverage versus percent called plot. In this plot, the total inferred frequency of a sample at a specific phylogenetic level is plotted against the mean coverage of that sample. As coverage decreases, PHLAME becomes less confident about individual calls and therefore assigns less of the sample. On the other hand, samples with high coverage that still have a lower percent assigned likely harbor uncharacterized or novel clades.
+```
+$ phlame classify -i data/skinmg_A.bam -c Cacnes_db.classifier -r reference_genome/Pacnes_C1.fasta -o skin_mg_frequencies.csv -p skin_mg_fitinfo.data -l Cacnes_cladeIDs_customnames.txt
+```
 
-![alt text](coverage.png)
+The frequencies of every clade at a specific phylogenetic level may sum to less than 1, which may indicate the presence of uncharacterized or novel clades in the sample. Generally, values below 1 are more common at more-finely resolved phylogenetic clades because you are less likely to fimd that specific clade in a random metagenomic sample. 
+
+In rare cases, total frequencies may sum to a value above 1, as the frequency of each clade is calculated independently. To address this, we recommend normalizing such cases down to 1.
+
+One useful way to analyze PHLAME results is using a Coverage versus Percent Called plot. In this plot, the total inferred frequency of a sample at a specific phylogenetic level is plotted against the mean coverage of that sample. As you can see coverage decreases, PHLAME becomes less confident about individual calls and therefore confidently assigns less of the sample. 
+
+You might notice a few samples with high coverage that still have a lower percent assigned. These samples often harbor uncharacterized or novel clades, and are good candidates to investigate more thoroughly using the `phlame plot` command.
+
+<img src="coverage.png" width="500">

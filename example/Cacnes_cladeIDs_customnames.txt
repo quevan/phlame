@@ -1,0 +1,8 @@
+F139-Stp-Lc14-2_t07	CladeA
+O386-Scr-Ch-5_t11	CladeA
+O383-Scr-Lc-5_t11	CladeA
+B080-Ext-RcBs-2_t00	CladeB
+B082-Ext-clNoBs-3_t00	CladeB
+Q395-Ext-trBaB-5_t15	CladeB
+B072-Scr-Rc-4_t00	CladeB
+R410-Ext-blFoBs-5_t15	CladeB
