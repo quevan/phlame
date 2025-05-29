@@ -1,8 +1,0 @@
-F139-Stp-Lc14-2_t07	C.1
-O386-Scr-Ch-5_t11	C.1
-O383-Scr-Lc-5_t11	C.1
-B080-Ext-RcBs-2_t00	C.2
-B082-Ext-clNoBs-3_t00	C.2
-Q395-Ext-trBaB-5_t15	C.2
-B072-Scr-Rc-4_t00	C.2
-R410-Ext-blFoBs-5_t15	C.2
