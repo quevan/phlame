@@ -231,6 +231,8 @@ class Pileup2Diversity:
 
     def main(self):
 
+        self.file_check()
+
         self.dependency_check()
         
         self.process_data()
@@ -240,7 +242,15 @@ class Pileup2Diversity:
             self.write_diversity(self.data, self.quals_sample, self.variant_pos,
                                  self.path_to_output_diversity)
 
+    def file_check(self):
 
+        # Check that bam file exists
+        if not os.path.exists(self.__path_to_bam_file):
+            raise FileNotFoundError(f"Cannot find the file: {self.__path_to_bam_file} !")
+        
+        if not os.path.exists(self.__ref_file):
+            raise FileNotFoundError(f"Cannot find the reference genome file: {self.__ref_file} !")
+        
     def dependency_check(self):
         
         if shutil.which("samtools") is None:
@@ -269,12 +279,14 @@ class Pileup2Diversity:
                            f"{shlex.quote(self.__path_to_bam_file)} > {self.__pileup_file}", shell=True)
             
             print("Running bcftools mpileup...")
-            print(f"bcftools mpileup -q30 -t SP -d3000 "+ \
+            print(f"bcftools mpileup -q30 -d3000 "+ \
                            f"-f {shlex.quote(self.__ref_file)} "+ \
                            f"{shlex.quote(self.__path_to_bam_file)} > {self.__vcf_tmp_file}")
-            subprocess.run(f"bcftools mpileup -q30 -t SP -d3000 "+ \
+            subprocess.run(f"bcftools mpileup -q30 -d3000 "+ \
                             f"-f {shlex.quote(self.__ref_file)} "+ \
                             f"{shlex.quote(self.__path_to_bam_file)} > {self.__vcf_tmp_file}", shell=True)
+            
+            self.vcf_check(self.__vcf_tmp_file)
             
             print("Running bcftools call...")
             print(f"bcftools call -c -Oz -o {self.__vcf_file} "+ \
@@ -292,7 +304,7 @@ class Pileup2Diversity:
 
             # ```
             # $ samtools mpileup -q30 -x -s -O -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.pileup
-            # $ bcftools mpileup -q30 -t SP -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.vcf.tmp
+            # $ bcftools mpileup -q30 -d3000 -f reference_genome/Pacnes_C1.fasta Cacnes_PMH7.bam > Cacnes_PMH7.vcf.tmp
             # $ bcftools call -c -Oz -o Cacnes_PMH7.vcf.gz Cacnes_PMH7.vcf.tmp --ploidy 1
             # $ bcftools view -Oz -v snps -q .75 Cacnes_PMH7.vcf.gz > Cacnes_PMH7.variant.vcf.gz
             # $ tabix -p vcf Cacnes_PMH7.variant.vcf.gz
@@ -310,6 +322,30 @@ class Pileup2Diversity:
                                                 self.scaf_names)
             
             self.variant_pos = self.generate_positions_single_sample(self.__variant_vcf_file)
+
+    @staticmethod
+    def vcf_check(vcf_file):
+        '''
+        Checks that the vcf files is not empty.
+        '''
+
+        with open(vcf_file, 'r') as f:
+            found_chrom_line = False
+            data_found = False
+
+            for line in f:
+                if line.strip().startswith('#CHROM'):
+                    found_chrom_line = True
+                    continue  # The next lines should be data
+                if found_chrom_line:
+                    if line.strip() and not line.strip().startswith('#'):
+                        data_found = True
+                        break  # No need to read further
+
+            if not found_chrom_line:
+                raise ValueError("VCF file does not contain a #CHROM header line.")
+            if not data_found:
+                raise ValueError("No data found after the #CHROM header line in the VCF file.")
 
 
     @staticmethod
@@ -351,6 +387,12 @@ class Pileup2Diversity:
         
         #read in mpileup file
         print(f"Reading input file: {path_to_pileup}")
+
+        num_lines = sum(1 for _ in open(path_to_pileup))
+        print(f"Number of lines in pileup file: {num_lines}")
+        if num_lines < 1:
+            raise ValueError("Pileup file is empty!")
+        
         mpileup = open(path_to_pileup)
         
         #####
@@ -383,15 +425,15 @@ class Pileup2Diversity:
                 ref = ref - 4
             
             #calls info
-            #calls=lineinfo[4]
-            calls=np.fromstring(lineinfo[4], dtype=np.int8) #to ASCII
-            # spits out a warning
+            # calls=np.fromstring(lineinfo[4], dtype=np.int8) #to ASCII
+            # Original line spits out a warning
+            calls=np.array([ord(l) for l in lineinfo[4]]) 
             # calls=np.array([ord(l) for l in lineinfo[4]]) #ASCII
             
             #find starts of reads ('^' in mpileup)
             startsk=np.where(calls==94)[0]
             for k in startsk:
-                calls[k:k+2]=-1 #WHAT IS -1
+                calls[k:k+2]=-1 
                 #remove mapping character, absolutely required because the next chracter could be $
             
             #find ends of reads ('$' in mpileup)

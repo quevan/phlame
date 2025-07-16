@@ -65,8 +65,6 @@ class Classify:
                  path_to_classifier,
                  ref_file,
                  path_to_frequencies,
-                 path_to_cts_file=None,
-                 path_to_pileup=None,
                  level_input=False,
                  path_to_data=False,
                  mode='mle',
@@ -74,9 +72,7 @@ class Classify:
                  nchain=10000, perc_burn=0.1, seed=False, verbose=True):
 
         self.__path_to_bam_file = path_to_bam
-        self.__path_to_pileup = path_to_pileup
 
-        self.__path_to_counts_file = path_to_cts_file
         self.__ref_file = ref_file
         self.__classifier_file = path_to_classifier
         self.__levels_input = level_input
@@ -101,6 +97,8 @@ class Classify:
         # =====================================================================
         print("Reading in file(s)...")
 
+        self.file_check()
+
         self.load_classifier()
 
         self.load_data()
@@ -124,6 +122,16 @@ class Classify:
         self.calc_frequencies()
             
         self.save_frequencies()
+
+
+    def file_check(self):
+
+        # Check that bam file exists
+        if not os.path.exists(self.__path_to_bam_file):
+            raise FileNotFoundError(f"Cannot find the file: {self.__path_to_bam_file} !")
+        
+        if not os.path.exists(self.__ref_file):
+            raise FileNotFoundError(f"Cannot find the reference genome file: {self.__ref_file} !")
 
 
     def get_positions(self,
@@ -241,11 +249,11 @@ class Classify:
         
         # Corresponding index on counts mat
         self.informative_pos_idx = np.arange(0,len(self.countsmat.pos))\
-            [np.in1d(self.countsmat.pos,self.informative_pos)]\
+            [np.isin(self.countsmat.pos,self.informative_pos)]\
                 [informative_bool]
 
         # informative_pos_idx = np.arange(0,len(pos))[np.sum(csSNPs,1)>0]
-        counts_CSS_bool = np.in1d(self.countsmat.pos,self.informative_pos)
+        counts_CSS_bool = np.isin(self.countsmat.pos,self.informative_pos)
 
         # Check that all positions are accounted for
         if np.sum(counts_CSS_bool) != len(np.unique(self.informative_pos)):
@@ -1109,7 +1117,7 @@ class PhyloLevel:
         
         for c in np.unique(clade_ids_long):
             names.append(str(c))
-            clades.append(names_long[np.in1d(clade_ids_long,c)])
+            clades.append(names_long[np.isin(clade_ids_long,c)])
         
         # Remove things designated as unclassifed
         if uncl_marker in names:

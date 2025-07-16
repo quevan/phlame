@@ -14,7 +14,7 @@ latency-wait: 50
 keep-going: True
 configfile: ./experiment_info.yaml
 conda-prefix: /nfs/tamilab001/c3ddb-scratch-mit_lieberman/tools/conda_snakemake
-cluster-status: /nfs/tamilab001/c3ddb-scratch-mit_lieberman/scripts/slurm_status.py
+cluster-status: ./scripts/slurm_status.py
 reason: True
 #dryrun: True
 #rerun-triggers: mtime
@@ -31,22 +31,20 @@ cluster:
     --job-name="SM.{rule}"
     --output="./logs/%j_{rule}.err.txt"
     --error="./logs/%j_{rule}.err.txt"
-    --exclude="node035,node390"
+    --exclude=""
     --mail-user="YOUR_EMAIL_HERE"
     --mail-type="FAIL"
 
 #note that resource names should use underscore _ instead of dash -
 
 default-resources:
-   - partition="sched_mit_tami,sched_mit_hill,sched_any,sched_mit_chisholm"
+   - partition="YOUR_PARTITION_HERE"
    - time="1:00:00"
    - ntasks=1
    - cpus_per_task=1
    - mem=8000
 
 set-resources:
-   # make_data_links
-   - make_data_links:partition="sched_mit_tami,sched_mit_hill,sched_any,sched_mit_chisholm,sched_mit_g4nier"
    # cutadapt
    - cutadapt:ntasks=1
    - cutadapt:cpus_per_task=1
@@ -81,28 +79,11 @@ set-resources:
    - combine_positions:mem_per_cpu=60000
    - combine_positions:cpus_per_task=1
    - combine_positions:time="02:00:00"
-   # phlame
+   # classify
    - classify:mem=16G
    - classify:cpus_per_task=1
    - classify:time="12:00:00"
-   # strainest
-   - strainest_makedb:mem=64G
-   - strainest_makedb:cpus_per_task=16
-   - strainest_makedb:time="1-00:00:00"
-   - strainest_classify:mem=32G
-   - strainest_classify:cpus_per_task=1
-   - strainest_classify:time="22:00:00"
-   # strainge
-   - strainge_makedb:mem=64G
-   - strainge_makedb:cpus_per_task=16
-   - strainge_makedb:time="1-00:00:00"
-   - strainge_classify:mem=128G
-   - strainge_classify:cpus_per_task=1
-   - strainge_classify:time="12:00:00"
-   # strainscan
-   - strainscan_makedb:mem=128G
-   - strainscan_makedb:cpus_per_task=16
-   - strainscan_makedb:time="1-00:00:00"
-   - strainscan_classify:mem=32G
-   - strainscan_classify:cpus_per_task=1
-   - strainscan_classify:time="12:00:00"
+   # plot
+   - plot:mem=10G
+   - plot:cpus_per_task=1
+   - plot:time="1:00:00"

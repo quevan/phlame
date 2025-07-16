@@ -14,7 +14,7 @@ latency-wait: 30
 keep-going: True
 configfile: ./experiment_info.yaml
 conda-prefix: /nfs/tamilab001/c3ddb-scratch-mit_lieberman/tools/conda_snakemake
-cluster-status: /nfs/tamilab001/c3ddb-scratch-mit_lieberman/scripts/slurm_status.py
+cluster-status: ./scripts/slurm_status.py
 reason: True
 # dryrun: True
 # unlock: True
@@ -45,7 +45,7 @@ default-resources:
 
 set-resources:
    # make_data_links
-   - make_data_links:partition="sched_mit_tami,sched_mit_hill,sched_any,sched_mit_g4nier,sched_mit_chisholm"
+   - make_data_links:partition="YOUR_PARTITION_HERE"
    # cutadapt
    - cutadapt:ntasks=1
    - cutadapt:cpus_per_task=1
@@ -85,22 +85,3 @@ set-resources:
    - candidate_mutation_table:mem_per_cpu=60000
    - candidate_mutation_table:cpus_per_task=1
    - candidate_mutation_table:time="12:00:00"
-   # build_data_links
-   - build_data_links:mem=24000
-   - build_data_links:mem_per_cpu=24000
-   - build_data_links:cpus_per_task=10
-   - build_data_links:time="12:00:00"
-   # kraken2
-   - kraken2:mem_per_cpu=10000
-   - kraken2:cpus_per_task=20
-   - kraken2:time="05:00:00"
-   # spades
-   - spades:mem=500G
-   - spades:cpus_per_task=16
-   - spades:time="12:00:00"
-   # sumstats
-   - sumstats:mem=10000
-   # prokka
-   - prokka:mem=100G
-   - prokka:cpus_per_task=16
-   - prokka:time="04:00:00"
