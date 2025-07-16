@@ -22,12 +22,12 @@ spls = config["sample_table"]
 from snakemake_functions import *
 # from itertools import compress
 
-[PATH_ls, SAMPLE_ls, FILENAME_ls, REF_Genome_ls, OUTGROUP_ls] = read_samples_CSV_classifier(spls)
+[PATH_ls, SAMPLE_ls, FILENAME_ls, REF_GENOME_ls, OUTGROUP_ls] = read_samples_CSV_classifier(spls)
 # Write sample_info.csv for each sample
-split_samplesCSV_classifier(PATH_ls, SAMPLE_ls, FILENAME_ls, REF_Genome_ls, OUTGROUP_ls)
+split_samplesCSV_classifier(PATH_ls, SAMPLE_ls, FILENAME_ls, REF_GENOME_ls, OUTGROUP_ls)
 
 # Require the same reference genome for all samples
-assert len(set(REF_Genome_ls))==1
+assert len(set(REF_GENOME_ls))==1
 
 ##########################################################################################
 
@@ -39,7 +39,7 @@ rule all:
 		# # Through alignment steps # #
 		expand("1-Mapping/bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
 		# # Candidate mutation table # #
-		"2-Case/candidate_mutation_table.pickle.gz",
+		expand("2-Case/CMT_ref_{reference}.pickle.gz",  reference=set(REF_GENOME_ls)),
 		
 
 rule make_data_links:
@@ -77,7 +77,7 @@ rule cutadapt:
 	log:
 		log="logs/cutadapt_{sampleID}.txt",
 	conda:
-		"envs/cutadapt.yaml",
+		"phlame_snakemake",
 	benchmark:
 		"benchmarks/rule_cutadapt_{sampleID}.benchmark",
 	shell:
@@ -99,7 +99,7 @@ rule sickle2050:
 	log:
 		log="logs/sickle2050_{sampleID}.txt",
 	conda:
-		"envs/sickle-trim.yaml",
+		"phlame_snakemake",
 	benchmark:
 		"benchmarks/rule_sickle2050_{sampleID}.benchmark",
 	shell:
@@ -116,7 +116,7 @@ rule refGenome_index:
 	output:
 		bowtie2idx=REF_GENOME_DIRECTORY+"/{reference}/genome_bowtie2.1.bt2",
 	conda:
-		"envs/bowtie2.yaml",
+		"phlame_snakemake",
 	shell:
 		"bowtie2-build -q {input.fasta} {params.refGenome} ;"
 
@@ -135,7 +135,7 @@ rule bowtie2:
 	benchmark:
 		"benchmarks/rule_bowtie2_{sampleID}_{reference}.benchmark",
 	conda:
-		"envs/bowtie2.yaml",
+		"phlame_snakemake",
 	shell:
 		# 8 threads coded into json
 		# --un-conc {params.fqU}
@@ -152,7 +152,7 @@ rule sam2bam:
 	benchmark:
 		"benchmarks/rule_sam2bam_{sampleID}_{reference}.benchmark",
 	conda:
-		"envs/samtools15_bcftools12.yaml",
+		"phlame_snakemake",
 	shell:
 		# 8 threads coded into json
 		" samtools view -bS {input.samA} | samtools sort - -o {output.bamA} ;"
@@ -166,7 +166,7 @@ rule samtools_idx:
     output:
         fasta_idx = REF_GENOME_DIRECTORY+"/{reference}/genome.fasta.fai",
     conda:
-        "envs/samtools15_bcftools12.yaml"
+        "phlame_snakemake"
     shell:
         " samtools faidx {input.fasta} ; "
 
@@ -184,12 +184,12 @@ rule mpileup2vcf:
 	benchmark:
 		"benchmarks/rule_mpileup2vcf_{sampleID}_{reference}.benchmark",
 	conda:
-		"envs/samtools15_bcftools12.yaml",
+		"phlame_snakemake",
 	shadow: 
 		"minimal", # avoids leaving leftover temp files esp if job aborted
 	shell:
 		" samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bamA} > {output.pileup} "
-		" bcftools mpileup -q30 -t SP -d3000 -f {input.ref} {input.bamA} > {params.vcf_tmp} "
+		" bcftools mpileup -q30 -d3000 -f {input.ref} {input.bamA} > {params.vcf_tmp} "
 		" bcftools call -c -Oz -o {output.vcf} {params.vcf_tmp} --ploidy 1 "
 		" bcftools view -Oz -v snps -q .75 {output.vcf} > {output.vcf_variants} "
 		" tabix -p vcf {output.vcf_variants} "
@@ -205,7 +205,7 @@ rule counts:
 	output:
 		counts="1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts"
 	conda:
-		"envs/phlame.yaml"
+		"phlame_snakemake"
 	shell:
 		"phlame counts -p {input.pileup} -v {input.vcf} -w {input.vcf_variants} -r {params.refGenome} -o {output.counts}"
 
@@ -229,9 +229,9 @@ rule candidate_mutation_table:
 		sample_names="2-Case/sample_names.txt",
 		ref=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
 	output:
-		cmt="2-Case/candidate_mutation_table.pickle.gz",
+		cmt="2-Case/CMT_ref_{reference}.pickle.gz",
 	conda:
-		"envs/phlame.yaml"
+		"phlame_snakemake"
 	shell:
 		"phlame cmt -i counts_files.txt -s sample_names.txt -r {input.ref} -o {output.cmt}"
 		

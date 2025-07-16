@@ -1,3 +1,11 @@
+
+## [1.1.0] - 2024-07-16
+- Some big bugfixes
+- phlame classify now errors out properly if it can't find the bam file
+- Fixed issue with fromstring() deprecation throwing an error in newer versions of numpy
+- Removed -t SP flag from bcftools mpileup, which creates an empty file in newer versions of bcftools
+
+
 ## [1.0.8] - 2024-04-16
 - Moved samtools and bcftools commands into phlame counts, changed input of phlame counts to .bam file
 
@@ -14,7 +22,7 @@
 - Updated snakemakes and README
 
 ## [1.0.3] - 2024-02-07
-- plot willl still make a less informative plot when looking at a mle data file
+- plot will still make a less informative plot when looking at a mle data file
 
 ## [1.0.2] - 2024-02-05
 - Fixed .bam file input in classify

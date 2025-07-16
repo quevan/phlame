@@ -24,8 +24,7 @@ import phlame.countsCMT as CMT
 
 def print_help():
     print('')
-    print('            ...::: PHLAME v1.0 :::...''')
-    print('       Evan Qu, Lieberman Lab, MIT. 2025\n''')
+    print('            ...::: PHLAME v1.1.X :::...''')
     print('Usage: phlame [-h] {classify,makedb,tree} ...\n')
     print('''
 Choose one of the operations below for more detailed help.

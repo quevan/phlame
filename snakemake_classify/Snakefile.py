@@ -35,6 +35,7 @@ assert len(set(CLASSIFIER_ls)) == 1
 rule all:
 	input:
 		expand("4-frequencies/{sampleID}_ref_{reference}_frequencies.csv", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
+		# Include plots as well
 		# expand("4-frequencies/{sampleID}_ref_{reference}_plot.pdf", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls))
 
 
@@ -184,8 +185,6 @@ rule plot:
 	input:
 		frequencies = rules.classify.output.frequencies,
 		data = rules.classify.output.data,
-	params:
-		refGenome="data/references/{reference}/genome.fasta"
 	conda:
 		"phlame_snakemake",
 	output:
@@ -194,8 +193,7 @@ rule plot:
 		"mkdir -p 4-frequencies ;"
 		"phlame plot "
 			"-f {input.bam} "
-			"-d {params.cfr} "
-			"-p {params.refGenome}"
+			"-d {input.data} "
 			"-o {output.plot} "
 			"--max_pi 0.3 "
 			"--min_prob 0.5 "
