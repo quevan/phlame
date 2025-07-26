@@ -45,7 +45,9 @@ class FrequenciesData():
             self.counts_MAP = fit_info_dct['counts_MAP']
             self.chain = fit_info_dct['chain']
             self.prob = fit_info_dct['prob']
-            self.mode = fit_info_dct['mode']
+
+            if 'mode' in fit_info_dct.keys():
+                self.mode = fit_info_dct['mode']
 
 
 # class CountsMat():
@@ -122,6 +124,12 @@ class CountsMat():
         
         data = np.zeros((len(allpos),num_fields)) #format [[A T C G  a t c g],[...]]
         
+        # Check that pileup file is not empty
+        num_lines = sum(1 for _ in open(input_pileup))
+        print(f"Number of lines in pileup file: {num_lines}")
+        if num_lines < 1:
+            raise Exception("Error: Pileup file produced is empty!")
+
         ##### read in mpileup file #####
         mpileup = open(input_pileup)
 

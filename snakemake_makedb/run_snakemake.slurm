@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name widevariant.main
-#SBATCH -p sched_mit_hill,sched_mit_tami,sched_mit_chisholm
+#SBATCH --job-name snakemake_makedb
+#SBATCH -p sched_mit_tami
 #SBATCH -n 1
 #SBATCH --time=12:00:00
 #SBATCH --mem=8GB
@@ -8,7 +8,6 @@
 #SBATCH -e mainerr.txt
 #SBATCH --mail-user=YOUR_EMAIL_HERE
 #SBATCH --mail-type=ALL
-#SBATCH --exclude=node327
 
 # Activate conda environment (may need to change name of env)
 source activate snakemake
