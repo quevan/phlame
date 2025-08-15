@@ -39,7 +39,10 @@ rule all:
 		# # Through alignment steps # #
 		expand("1-Mapping/bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
 		# # Candidate mutation table # #
-		expand("2-Case/CMT_ref_{reference}.pickle.gz",  reference=set(REF_GENOME_ls)),
+		expand("2-CMT/CMT_ref_{reference}.pickle.gz", reference=set(REF_GENOME_ls)),
+		# # Database # #
+		expand("2-CMT/output_ref_{reference}.classifier", reference=set(REF_GENOME_ls)),
+
 		
 
 rule make_data_links:
@@ -170,36 +173,9 @@ rule samtools_idx:
     shell:
         " samtools faidx {input.fasta} ; "
 
-rule mpileup2vcf:
-	input:
-		bamA=rules.sam2bam.output.bamA,
-		ref=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
-		fasta_idx = ancient(rules.samtools_idx.output.fasta_idx),
-	output:
-		pileup="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-		vcf="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
-		vcf_variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
-	params:
-		vcf_tmp="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.vcf.tmp",
-	benchmark:
-		"benchmarks/rule_mpileup2vcf_{sampleID}_{reference}.benchmark",
-	conda:
-		"phlame_snakemake",
-	shadow: 
-		"minimal", # avoids leaving leftover temp files esp if job aborted
-	shell:
-		" samtools mpileup -q30 -x -s -O -d3000 -f {input.ref} {input.bamA} > {output.pileup} "
-		" bcftools mpileup -q30 -d3000 -f {input.ref} {input.bamA} > {params.vcf_tmp} "
-		" bcftools call -c -Oz -o {output.vcf} {params.vcf_tmp} --ploidy 1 "
-		" bcftools view -Oz -v snps -q .75 {output.vcf} > {output.vcf_variants} "
-		" tabix -p vcf {output.vcf_variants} "
-		" rm {params.vcf_tmp} "
-
 rule counts:
 	input:
-		pileup="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.pileup",
-		vcf="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.vcf.gz",
-		vcf_variants="1-Mapping/vcf/{sampleID}_ref_{reference}_aligned.sorted.strain.variant.vcf.gz",
+		bam="1-Mapping/bowtie2/{sampleID}_ref_{reference}_aligned.sorted.bam"
 	params:
 		refGenome=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
 	output:
@@ -207,31 +183,60 @@ rule counts:
 	conda:
 		"phlame_snakemake"
 	shell:
-		"phlame counts -p {input.pileup} -v {input.vcf} -w {input.vcf_variants} -r {params.refGenome} -o {output.counts}"
+		"phlame counts -i {input.bam}  -r {params.refGenome} -o {output.counts}"
 
 rule candidate_mutation_table_prep:
 	input:
 		counts=expand("1-Mapping/counts/{sampleID}_ref_{reference}_aligned.counts", sampleID=SAMPLE_ls, reference=set(REF_GENOME_ls)),
 	output:
-		counts_files="2-Case/counts_files.txt",
-		sample_names="2-Case/sample_names.txt",
+		counts_files="2-CMT/counts_files.txt",
+		sample_names="2-CMT/sample_names.txt",
 	run:
-		with open(output.counts_files) as f:
+		if not os.path.isdir('2-CMT'):
+		   os.makedirs('2-CMT')
+		with open(output.counts_files,'w') as f:
 			for c in input.counts:
 				f.write(c+'\n')
-		with open(output.sample_names) as f:
+		with open(output.sample_names,'w') as f:
 			for s in SAMPLE_ls:
 				f.write(s+'\n')
 			
 rule candidate_mutation_table:
 	input:
-		counts_files="2-Case/counts_files.txt",
-		sample_names="2-Case/sample_names.txt",
+		counts_files="2-CMT/counts_files.txt",
+		sample_names="2-CMT/sample_names.txt",
 		ref=REF_GENOME_DIRECTORY+"/{reference}/genome.fasta",
 	output:
-		cmt="2-Case/CMT_ref_{reference}.pickle.gz",
+		cmt="2-CMT/CMT_ref_{reference}.pickle.gz",
 	conda:
 		"phlame_snakemake"
 	shell:
-		"phlame cmt -i counts_files.txt -s sample_names.txt -r {input.ref} -o {output.cmt}"
+		"phlame cmt -i {input.counts_files} -s {input.sample_names} -r {input.ref} -o {output.cmt}"
+
+rule tree:
+	input:
+		cmt = "2-CMT/CMT_ref_{reference}.pickle.gz",
+	output:
+		phylip = '2-CMT/CMT_ref_{reference}.phylip',
+		phylip2names = '2-CMT/CMT_ref_{reference}_phylip2names.txt',
+		tree = '2-CMT/output_ref_{reference}.tre',
+	conda:
+		"phlame_snakemake"
+	shell:
+		"phlame tree -i {input.cmt} -p {output.phylip} -r {output.phylip2names} -o {output.tree}"
+
+
+rule makedb:
+	input:
+		cmt = "2-CMT/CMT_ref_{reference}.pickle.gz",
+		outtree = rules.tree.output.tree,
+	params:
+		rescaled_tree = '2-CMT/rescaled_output_ref_{reference}.tre',
+	output:
+		classifier = "2-CMT/output_ref_{reference}.classifier",
+		cladeIDs = "2-CMT/output_ref_{reference}_cladeIDs.txt",
+	conda:
+		"phlame_snakemake"
+	shell:
+		"phlame makedb -i {input.cmt} -t {params.rescaled_tree} -o {output.classifier} -p {output.cladeIDs} --min_branchlen 500 --min_leaves 3 --midpoint"
 		
