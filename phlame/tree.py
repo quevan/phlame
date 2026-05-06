@@ -347,8 +347,7 @@ class CMT2tree():
 
         self.raxml()
 
-        self.raxml_success()
-
+        print("Tree built. Renaming phylip names...")
         self.rename_phylip()
 
         
@@ -575,32 +574,13 @@ class CMT2tree():
                         " -w " + shlex.quote(working_dir) +
                         " -n " + basename + 
                         " -m GTRCAT -p 12345 ", shell=True)
-        
-    def raxml_success(self):
-        '''
-        Check if RAxML ran successfully.
-        '''
 
-        basename = os.path.basename(self.output_tree)
-        raxml_outpath = self.output_tree.replace(basename, 
-                                                 'RAxML_bestTree.'+basename)
-
-        if not os.path.exists(raxml_outpath):
-            raise Exception("RAxML output tree file not found: " + raxml_outpath)
-        
-        else:
-            print("Tree built successfully: " + raxml_outpath)
-        
-        return True
-        
 
     def rename_phylip(self):
         '''
         Convert 10chr phylip names in a nwk file into long format.
         And get away from raxml naming system!
         '''
-
-        print("Renaming phylip names in tree...")
 
         # Read in RAxML tree
         basename = os.path.basename(self.output_tree)

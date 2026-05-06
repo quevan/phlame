@@ -154,7 +154,10 @@ class CountsMat():
             if len(self.chr_starts) == 1:
                 position=int(lineinfo[1])
             else:
-                position=int(self.chr_starts[np.where(chromo==self.scaf_names)]) + int(lineinfo[1])
+                scaf_idx = np.where(self.scaf_names == chromo)[0]
+                if scaf_idx.size == 0:
+                    raise ValueError(f"Contig {chromo} not found in reference scaffolds.")
+                position=int(self.chr_starts[scaf_idx[0]]) + int(lineinfo[1])
                 #chr_starts begins at 0
             pidx = np.searchsorted(allpos, position) # index of position on allpos
             
@@ -467,7 +470,7 @@ def read_clades_file(path_to_clades_file, uncl_marker):
         if clade==uncl_marker:
             continue
         
-        isclade_bool = np.in1d(clade_ids[:,1], clade)
+        isclade_bool = np.isin(clade_ids[:,1], clade)
         clade_samples = clade_ids[isclade_bool,0].tolist()
         
         clades_dct[clade] = clade_samples
