@@ -911,7 +911,7 @@ def slice_sampler(x0,
         # =================================================================
         #  Get straight line segment at y under the curve L(x)
         # =================================================================
-        rr = np.random.rand(1)
+        rr = np.random.rand()
 
         # Initialize left and right of segment with total distance sigma
         x_l = float(xx)
