@@ -36,9 +36,10 @@ class MakeDB():
                  maxn=0.1,
                  core=0.9,
                  min_maf_for_call=0.75, 
-                 min_strand_cov_for_call=2,
+                 min_cov_for_call=2,
                  max_qual_for_call=-30,
-                 max_frac_ambiguous=0.5,
+                 max_frac_ambiguous_position=0.25,
+                 max_frac_ambiguous_sample=0.2,
                  max_outgroup=0.1,
                  midpoint_root=False
                  ):
@@ -66,9 +67,10 @@ class MakeDB():
         self.max_outgroup = max_outgroup
 
         self.min_maf_for_call = min_maf_for_call
-        self.min_strand_cov_for_call = min_strand_cov_for_call
+        self.min_cov_for_call = min_cov_for_call
         self.max_qual_for_call = max_qual_for_call
-        self.max_frac_ambiguous = max_frac_ambiguous
+        self.max_frac_ambiguous_sample = max_frac_ambiguous_sample
+        self.max_frac_ambiguous_position = max_frac_ambiguous_position
 
     def readin(self):
         '''
@@ -76,6 +78,8 @@ class MakeDB():
         '''
 
         self.CMT = helper.CandidateMutationTable(self.__path_to_cmt)
+        
+        self.CMT.calc_coverage()
         
         self.sample_names = helper.rphylip(self.CMT.sample_names)
         
@@ -143,17 +147,26 @@ class MakeDB():
 
         # Mask ambiguous allele calls
         calls = np.copy(core_maNT)
-        # calls[ quals[is_core_genome] > self.max_qual_for_call ] = 0
-        # calls[ ingroup_maf[is_core_genome] < self.min_maf_for_call ] = 0
+
+        # Filter allele calls
+        calls[ self.CMT.quals[is_core_genome] > self.max_qual_for_call ] = 0
+        calls[ maf[is_core_genome] < self.min_maf_for_call ] = 0
+        calls[ self.CMT.coverage[is_core_genome] < self.min_cov_for_call] = 0
+
+        # Mask positions that have too many ambiguous calls across multiple samples
+        fracNs_bool_position = ( ((calls>0).sum(axis=1)/np.shape(calls)[1]) >= self.max_frac_ambiguous_position )
+        print(f"Number of quality filtered core positions: {np.count_nonzero(fracNs_bool_position)}")
+        if np.count_nonzero(fracNs_bool_position) < 10:
+            raise Warning('After filtering, there are fewer than 10 positions! Consider adjusting your filtering parameters')
 
         # Mask samples with too many ambiguous allele calls
-        fracNs_bool = ( ((calls>0).sum(axis=0)/len(calls)) >= self.max_frac_ambiguous )
+        fracNs_bool_sample = ( ((calls>0).sum(axis=0)/len(calls)) >= self.max_frac_ambiguous_sample )
         
-        if np.count_nonzero(~fracNs_bool) > 0:
+        if np.count_nonzero(~fracNs_bool_sample) > 0:
             print('The following samples have too many ambiguous allele calls and will not be considered:')
-            print('\n'.join(self.ingroup_sample_names[~fracNs_bool]))
+            print('\n'.join(self.ingroup_sample_names[~fracNs_bool_sample]))
 
-        if np.count_nonzero(fracNs_bool) < 2:
+        if np.count_nonzero(fracNs_bool_sample) < 2:
             raise Warning('After filtering, there are fewer than 3 samples!')
 
         # Moving this to inside the unaminous_to_clade function
@@ -168,7 +181,7 @@ class MakeDB():
         print('Getting unanimous alleles...')
         unanimous_alleles = unanimous_to_clade(calls, self.ingroup_sample_names,
                                                candidate_clades, candidate_clade_names,
-                                               self.maxn, self.max_frac_ambiguous)
+                                               self.maxn, self.max_frac_ambiguous_sample)
 
         print('Getting unique alleles...')
         candidate_css = unique_to_clade(calls, unanimous_alleles, self.ingroup_sample_names,
@@ -250,7 +263,7 @@ class MakeDB():
         self.parse_outgroup()
         
         # Define outgroup
-        outgroup_bool = np.in1d(self.sample_names, self.outgroup_ls)
+        outgroup_bool = np.isin(self.sample_names, self.outgroup_ls)
         
         if np.sum(outgroup_bool) == 0:
             self.ingroup = self.maNT
@@ -411,7 +424,7 @@ class MakeDB():
         return np.array(rename)    
 
         
-def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, max_frac_ambiguous):
+def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, max_frac_ambiguous_sample):
     '''For a list of clades defined by their daughter genomes, return all alleles
     along genomes that are unanimous to members of an individual clade. Clades can
     be ancestors/children of each other.
@@ -449,7 +462,7 @@ def unanimous_to_clade(calls, sample_names, candidate_clades, clade_names, n, ma
         clade_calls = calls[:,clade_idx] 
 
         # Mask samples with too many ambiguous allele calls
-        mask_fracNs = ( ((clade_calls>0).sum(axis=0)/len(clade_calls)) >= max_frac_ambiguous )
+        mask_fracNs = ( ((clade_calls>0).sum(axis=0)/len(clade_calls)) >= max_frac_ambiguous_sample )
         if np.sum(mask_fracNs) < 2:
             raise Warning(f"After filtering, Clade {cname} does not have enough genomes to call unanimous alleles!")
         
@@ -501,14 +514,14 @@ def unique_to_clade(maNT, unanimous_alleles, sample_names, candidate_clades, cla
     cl = []
     for key, val in candidate_clades.items():
         cl = cl + val
-    uncl_bool = np.in1d( sample_names,
+    uncl_bool = np.isin( sample_names,
                          cl)
     
     for c, cname in enumerate(clade_names):
         
         #Genomes to compare this clade against for uniqueness
         
-        cp_bool = ~np.in1d( sample_names,
+        cp_bool = ~np.isin( sample_names,
                             np.array(candidate_clades[cname]) ) & uncl_bool
                     
         # cp_bool = ~np.in1d( clade_names, np.unique(np.array(ancdesc)) )

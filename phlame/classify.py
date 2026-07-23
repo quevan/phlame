@@ -68,8 +68,15 @@ class Classify:
                  level_input=False,
                  path_to_data=False,
                  mode='mle',
-                 min_snps=10, max_pi=0.3, min_prob=0.5, min_hpd=0.1,
-                 nchain=10000, perc_burn=0.1, seed=False, verbose=True):
+                 min_snps=10,
+                 max_pi=0.3,
+                 min_prob=0.5,
+                 min_hpd=0.1,
+                 nchain=10000,
+                 perc_burn=0.1,
+                 max_positions_to_model=5000,
+                 seed=False,
+                 verbose=True):
 
         self.__path_to_bam_file = path_to_bam
 
@@ -86,6 +93,7 @@ class Classify:
 
         self.nchain = nchain
         self.perc_burn = perc_burn
+        self.max_positions_to_model = max_positions_to_model
         self.seed = seed
 
         self.mode = mode
@@ -339,7 +347,6 @@ class Classify:
                                                         np.count_nonzero(cts2model==0))
                     if ratio_nonzero_zero == np.inf:
                         ratio_nonzero_zero = 1.0
-                    
                                 
                 print(f"Fit results for clade: {clade_names[c]}")
                 
@@ -350,7 +357,8 @@ class Classify:
                                                     
                 frequency, prob = fit.fit(max_pi = self.max_pi,
                                           nchain = self.nchain,
-                                          nburn = int(self.perc_burn*self.nchain))
+                                          nburn = int(self.perc_burn*self.nchain),
+                                          subsample_positions = self.max_positions_to_model)
 
                 # print(f"MLE fit: cts lambda={fit.counts_MLE[0]:.2f} cts pi={fit.counts_MLE[1]:.2f}")
                 # print(f"total lambda={fit.total_MLE[0]:.2f} total pi={fit.total_MLE[1]:.2f}")
@@ -488,7 +496,7 @@ class countsCSS_NEW:
             nchain=10000, 
             nburn=500,
             interval_size=0.95,
-            subsample=True
+            subsample_positions=5000
             ):
         '''
         Fit counts data to model.
@@ -528,8 +536,8 @@ class countsCSS_NEW:
 
             self.counts_MLE = (pi_MLE,lambda_MLE)
 
-            if subsample & (len(self.counts) > 1000):
-                self.counts, self.total_counts = self.subsample_positions(1000)
+            if len(self.counts) > subsample_positions:
+                self.counts, self.total_counts = self.subsample_positions(subsample_positions)
                 
             try:
                 param_chains, lv_chains = self.ZINB_gibbs_sampler(nchain,

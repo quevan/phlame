@@ -199,6 +199,7 @@ class CMT2tree():
                  min_presence_core=0.9,
                  min_median_cov_samples=3,
                  max_frac_ambiguous_pos=0.05,
+                 max_frac_ambiguous_sample=0.3,
                  max_mean_copynum=2.5,
                  remov_recomb=None):
         
