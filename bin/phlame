@@ -12,6 +12,7 @@ import sys
 # sys.set_int_max_str_digits(0)
 # So I don't get weird ValueError: Exceeds the limit (4300) for integer string conversion
 
+from phlame import __version__
 import phlame.classify as classify
 import phlame.tree as tree
 import phlame.makedb as makedb
@@ -24,7 +25,7 @@ import phlame.countsCMT as CMT
 
 def print_help():
     print('')
-    print('            ...::: PHLAME v1.1.X :::...''')
+    print(f'            ...::: PHLAME v{__version__} :::...')
     print('Usage: phlame [-h] {classify,makedb,tree} ...\n')
     print('''
 Choose one of the operations below for more detailed help.
@@ -46,6 +47,11 @@ if __name__ == '__main__':
     # Main help message
     if len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
         print_help()
+        sys.exit(0)
+
+    # Version
+    if sys.argv[1] == '-v' or sys.argv[1] == '--version':
+        print(f'PHLAME v{__version__}')
         sys.exit(0)
 
     
@@ -88,8 +94,10 @@ if __name__ == '__main__':
                           help='Bayesian only: Minimum probability score to count a lineage as present. Default = 0.5.')
     classify_op.add_argument('--min_hpd', type=int, default=0.15, required=False,
                           help='Bayesian only: Minimum value the highest posterior density interval over divergence must cover to count a lineage as present. Default = 0.15.')
+    classify_op.add_argument('--max_positions_to_model', type=int, default=5000, required=False,
+                          help='Maximum number of informative positions to model per clade. Clades with more positions are randomly subsampled to this number before fitting. Default = 5000.')
     classify_op.add_argument('--seed', type=int, required=False, default=False,
-                          help='Set random seed for reproducibility.') 
+                          help='Set random seed for reproducibility.')
     classify_op.add_argument('--verbose', required=False,  action='store_true', default=True,
                             help='Print progress messages.')
 
@@ -131,12 +139,15 @@ if __name__ == '__main__':
     
     makedb_op.add_argument('--minAF', type=float, default=0.75, required=False,
                           help='Minimum allele frequency to make a base call. Default = 0.75.')
-    makedb_op.add_argument('--min_strand_cov', type=int, default=2, required=False,
-                            help='Minimum per-strand coverage across a position to make a base call. Default = 2.')
+    makedb_op.add_argument('--min_cov', type=int, default=2, required=False,
+                            help='Minimum coverage across a position in a given sample to make a base call. Default = 2.')
     makedb_op.add_argument('--qual', type=int, default=-30, required=False,
                             help='Minimum MAPQ score to make a base call. Default = -30.')
-    makedb_op.add_argument('--max_frac_ambiguous', type=float, default=0.5, required=False,
-                            help='Maximum fraction of ambiguous (N) calls to include a sample. Default = 0.5.')
+    makedb_op.add_argument('--max_frac_ambiguous_position', type=float, default=0.25, required=False,
+                            help='Maximum fraction of ambiguous (N) calls across samples to include a position. Default = 0.25.')
+    makedb_op.add_argument('--max_frac_ambiguous_sample', type=float, default=0.3, required=False,
+                        help='Maximum fraction of ambiguous (N) calls in a sample to include a sample. Default = 0.3.')
+
     makedb_op.add_argument('--midpoint', required=False,  action='store_true', default=False,
                             help='Root the input tree at the midpoint. Default = False.')
 
@@ -168,8 +179,8 @@ if __name__ == '__main__':
                         help='Minimum percent of samples a position must be found in (non-N) to be considered.')
     tree_op.add_argument('--min_cov_position', type=int, default=3, required=False,
                         help='Minimum median coverage of position across samples to include.')
-    tree_op.add_argument('--max_frac_ambiguous', type=float, default=0.1, required=False,
-                        help='Maximum fraction of ambiguous (N) calls to include a sample.')
+    tree_op.add_argument('--max_frac_ambiguous_sample', type=float, default=0.3, required=False,
+                        help='Maximum fraction of ambiguous (N) calls to include a sample. Default = 0.3.')
     tree_op.add_argument('--copynum', type=float, default=2.5, required=False,
                         help='Maximum average copy number to include a position.')
     
@@ -227,6 +238,7 @@ if __name__ == '__main__':
                                     min_snps = args.min_snps,
                                     min_prob = args.min_prob,
                                     min_hpd=args.min_hpd,
+                                    max_positions_to_model=args.max_positions_to_model,
                                     seed = args.seed,
                                     verbose = args.verbose)
         
@@ -247,9 +259,10 @@ if __name__ == '__main__':
                            maxn = args.maxn,
                            core = args.core,
                            min_maf_for_call=args.minAF,
-                           min_strand_cov_for_call=args.min_strand_cov,
+                           min_cov_for_call=args.min_cov,
                            max_qual_for_call=args.qual,
-                           max_frac_ambiguous=args.max_frac_ambiguous,
+                           max_frac_ambiguous_position=args.max_frac_ambiguous_position,
+                           max_frac_ambiguous_sample=args.max_frac_ambiguous_sample,
                            max_outgroup=args.max_outgroup,
                            midpoint_root=args.midpoint)
 
@@ -270,7 +283,7 @@ if __name__ == '__main__':
                                 max_qual_for_call=args.qual,
                                 min_presence_core=args.core,
                                 min_median_cov_samples=args.min_cov_position,
-                                max_frac_ambiguous_pos=args.max_frac_ambiguous,
+                                max_frac_ambiguous_sample=args.max_frac_ambiguous_sample,
                                 max_mean_copynum=args.copynum,
                                 remov_recomb=args.remov_recomb)
         

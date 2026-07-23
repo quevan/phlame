@@ -388,13 +388,24 @@ class CandidateMutationTable():
         Read in candidate mutation table from pickled object file.
         '''
         
-        if path_to_cmt_file.endswith('.pickle.gz'):
-            with gzip.open(path_to_cmt_file,'rb') as f:
+        if not path_to_cmt_file:
+            raise ValueError("No candidate mutation table file was provided. "
+                             "Pass a path to a '.pickle.gz' or '.pickle' file.")
+
+        if not os.path.exists(path_to_cmt_file):
+            raise FileNotFoundError(f"Candidate mutation table file not found: "
+                                    f"'{path_to_cmt_file}'")
+
+        opener = gzip.open if path_to_cmt_file.endswith('.gz') else open
+
+        try:
+            with opener(path_to_cmt_file, 'rb') as f:
                 CMT = pickle.load(f)
-        
-        elif path_to_cmt_file.endswith('.pickle'):
-            with open(path_to_cmt_file,'rb') as f:
-                CMT = pickle.load(f)
+        except Exception as e:
+            raise IOError(f"Could not read candidate mutation table file "
+                          f"'{path_to_cmt_file}'. Make sure it is a valid "
+                          f"pickle file (gzipped if it ends in '.gz'). "
+                          f"Original error: {e}")
 
         self.sample_names = np.array(CMT['sample_names'])
         self.counts = CMT['counts']
@@ -467,7 +478,7 @@ def read_clades_file(path_to_clades_file, uncl_marker):
         if clade==uncl_marker:
             continue
         
-        isclade_bool = np.in1d(clade_ids[:,1], clade)
+        isclade_bool = np.isin(clade_ids[:,1], clade)
         clade_samples = clade_ids[isclade_bool,0].tolist()
         
         clades_dct[clade] = clade_samples
