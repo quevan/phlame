@@ -92,7 +92,7 @@ if __name__ == '__main__':
                           help='Minimum number of present mutations to count a lineage as present. Default = 10.')
     classify_op.add_argument('--min_prob', type=float, default=0.5, required=False,
                           help='Bayesian only: Minimum probability score to count a lineage as present. Default = 0.5.')
-    classify_op.add_argument('--min_hpd', type=int, default=0.15, required=False,
+    classify_op.add_argument('--min_hpd', type=float, default=0.15, required=False,
                           help='Bayesian only: Minimum value the highest posterior density interval over divergence must cover to count a lineage as present. Default = 0.15.')
     classify_op.add_argument('--max_positions_to_model', type=int, default=5000, required=False,
                           help='Maximum number of informative positions to model per clade. Clades with more positions are randomly subsampled to this number before fitting. Default = 5000.')
